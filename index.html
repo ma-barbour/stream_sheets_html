@@ -332,6 +332,12 @@
         let isYahooLoading = false;
 
         let selectedCompareSkaters = ['', '', '', '', ''];
+        let leadersDisplayMode = 'values';
+        
+        function toggleLeadersMode(mode) {
+            leadersDisplayMode = mode;
+            renderContent();
+        }
 
         function toggleDropdown(id = 'main-dropdown') {
             const d = document.getElementById(id);
@@ -399,10 +405,15 @@
                       xgRankIdx = getIdx(['xg_gp_rank']),
                       gpIdx = getIdx(['games_played', 'gp']),
                       goalsIdx = getIdx(['goals_x_en_gp']),
+                      goalsRankIdx = getIdx(['goals_x_en_gp_rank', 'goals_gp_rank']),
                       dsaIdx = getIdx(['dsa_gp']),
+                      dsaRankIdx = getIdx(['dsa_gp_rank']),
                       oixgIdx = getIdx(['oi_xg_gp', 'on-ice xg/gp', 'on-ice xg_gp']),
+                      oixgRankIdx = getIdx(['oi_xg_gp_rank']),
                       assistsIdx = getIdx(['assists_x_en_gp']),
+                      assistsRankIdx = getIdx(['assists_x_en_gp_rank', 'assists_gp_rank']),
                       oiDsaIdx = getIdx(['oi_dsa_gp']),
+                      oiDsaRankIdx = getIdx(['oi_dsa_gp_rank']),
                       startDateIdx = getIdx(['start_date']),
                       endDateIdx = getIdx(['end_date']);
 
@@ -415,10 +426,15 @@
                     xg_gp_rank: parseInt(row[xgRankIdx]) || 0,
                     gp: parseInt(row[gpIdx]) || 0,
                     goals_gp: parseFloat(row[goalsIdx]) || 0,
+                    goals_gp_rank: parseInt(row[goalsRankIdx]) || 0,
                     dsa_gp: parseFloat(row[dsaIdx]) || 0,
+                    dsa_gp_rank: parseInt(row[dsaRankIdx]) || 0,
                     oi_xg_gp: parseFloat(row[oixgIdx]) || 0,
+                    oi_xg_gp_rank: parseInt(row[oixgRankIdx]) || 0,
                     assists_gp: parseFloat(row[assistsIdx]) || 0,
-                    oi_dsa_gp: parseFloat(row[oiDsaIdx]) || 0
+                    assists_gp_rank: parseInt(row[assistsRankIdx]) || 0,
+                    oi_dsa_gp: parseFloat(row[oiDsaIdx]) || 0,
+                    oi_dsa_gp_rank: parseInt(row[oiDsaRankIdx]) || 0
                 }));
 
                 gameLogsData = logsRaw.slice(1).map(row => ({
@@ -541,36 +557,45 @@
         }
 
         function renderLeadersHeader(container) {
-            container.innerHTML = `
-                <h2 class="page-title">xG LEADERS (LAST 2 WEEKS)</h2>
-                ${dataRangeText ? `<div class="page-timestamp">${dataRangeText}</div>` : ''}
-                <div class="flex justify-center">
-                    <div class="relative w-full max-w-sm">
-                        <button onclick="toggleDropdown()" id="team-select-btn" class="w-full flex items-center justify-between px-6 md:px-8 py-4 md:py-5 bg-white border-2 border-gray-100 rounded-full md:rounded-[2.5rem] hover:border-blue-100 transition-all shadow-xl shadow-gray-200/40 group">
-                            <div class="flex items-center gap-3 md:gap-4">
-                                <div class="w-10 h-10 md:w-16 md:h-16 bg-blue-50 text-[#001F3F] rounded-xl md:rounded-2xl flex items-center justify-center font-black">
-                                    <div class="flex items-center gap-0.5 text-[9px] md:text-[13px]">
-                                        <span>F</span>
-                                        <div class="w-[1px] h-3 md:h-4 bg-[#001F3F]/20 rounded-full mx-0.5"></div>
-                                        <span>D</span>
-                                    </div>
-                                </div>
-                                <div class="flex flex-col items-start text-left">
-                                    <span class="text-[8px] md:text-[9px] font-black text-gray-400 uppercase tracking-widest mb-0.5 opacity-60">Positions Selected</span>
-                                    <span class="font-black text-xl md:text-3xl tracking-tighter uppercase leading-none text-[#001F3F]">${currentPosition}</span>
-                                </div>
+    container.innerHTML = `
+        <h2 class="page-title">xG LEADERS (LAST 2 WEEKS)</h2>
+        ${dataRangeText ? `<div class="page-timestamp">${dataRangeText}</div>` : ''}
+        <div class="flex flex-col items-center gap-4">
+            
+            <!-- POSITION DROPDOWN -->
+            <div class="relative w-full max-w-sm">
+                <button onclick="toggleDropdown()" id="team-select-btn" class="w-full flex items-center justify-between px-6 md:px-8 py-4 md:py-5 bg-white border-2 border-gray-100 rounded-full md:rounded-[2.5rem] hover:border-blue-100 transition-all shadow-xl shadow-gray-200/40 group">
+                    <div class="flex items-center gap-3 md:gap-4">
+                        <div class="w-10 h-10 md:w-16 md:h-16 bg-blue-50 text-[#001F3F] rounded-xl md:rounded-2xl flex items-center justify-center font-black">
+                            <div class="flex items-center gap-0.5 text-[9px] md:text-[13px]">
+                                <span>F</span>
+                                <div class="w-[1px] h-3 md:h-4 bg-[#001F3F]/20 rounded-full mx-0.5"></div>
+                                <span>D</span>
                             </div>
-                            <svg class="w-5 h-5 md:w-6 md:h-6 text-gray-300 group-hover:text-[#001F3F] transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M19 9l-7 7-7-7"></path></svg>
-                        </button>
-                        <div id="main-dropdown" class="hidden absolute top-full left-0 right-0 mt-3 bg-white border border-gray-100 rounded-3xl shadow-2xl z-[100] p-3 flex flex-col gap-1">
-                            ${['ALL', 'FORWARDS', 'DEFENDERS'].map(pos => `
-                                <button onclick="selectPosition('${pos}')" class="px-6 py-4 rounded-xl text-[10px] md:text-[11px] font-black transition-all ${currentPosition === pos ? 'bg-blue-50 text-[#001F3F]' : 'hover:bg-gray-50 text-gray-500'}">
-                                    ${pos}
-                                </button>`).join('')}
+                        </div>
+                        <div class="flex flex-col items-start text-left">
+                            <span class="text-[8px] md:text-[9px] font-black text-gray-400 uppercase tracking-widest mb-0.5 opacity-60">Positions Selected</span>
+                            <span class="font-black text-xl md:text-3xl tracking-tighter uppercase leading-none text-[#001F3F]">${currentPosition}</span>
                         </div>
                     </div>
-                </div>`;
-        }
+                    <svg class="w-5 h-5 md:w-6 md:h-6 text-gray-300 group-hover:text-[#001F3F] transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M19 9l-7 7-7-7"></path></svg>
+                </button>
+                <div id="main-dropdown" class="hidden absolute top-full left-0 right-0 mt-3 bg-white border border-gray-100 rounded-3xl shadow-2xl z-[100] p-3 flex flex-col gap-1">
+                    ${['ALL', 'FORWARDS', 'DEFENDERS'].map(pos => `
+                        <button onclick="selectPosition('${pos}')" class="px-6 py-4 rounded-xl text-[10px] md:text-[11px] font-black transition-all ${currentPosition === pos ? 'bg-blue-50 text-[#001F3F]' : 'hover:bg-gray-50 text-gray-500'}">
+                            ${pos}
+                        </button>`).join('')}
+                </div>
+            </div>
+            
+            <!-- THINNER SLIDER STACKED BELOW -->
+            <div class="bg-white p-0.5 rounded-full border border-gray-200 shadow-sm inline-flex">
+                <button onclick="toggleLeadersMode('values')" class="px-5 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest transition-all ${leadersDisplayMode === 'values' ? 'bg-[#001F3F] text-white shadow-md' : 'text-gray-400 hover:text-[#001F3F]'}">Values</button>
+                <button onclick="toggleLeadersMode('ranks')" class="px-5 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest transition-all ${leadersDisplayMode === 'ranks' ? 'bg-[#001F3F] text-white shadow-md' : 'text-gray-400 hover:text-[#001F3F]'}">Ranks</button>
+            </div>
+
+        </div>`;
+}
 
         function renderLeadersPage(container) {
             const section = document.createElement('section');
@@ -588,6 +613,12 @@
             } else if (currentPosition === 'DEFENDERS') {
                 displayData = displayData.filter(p => ['D','DEF'].includes((p.pos||'').toUpperCase()));
             }
+            
+            const isRanks = leadersDisplayMode === 'ranks';
+            const formatStat = (val, rank) => {
+                if (isRanks) return rank > 0 ? rank : '-';
+                return val.toFixed(2);
+            };
 
             const rows = displayData.slice(0, 100).map(p => {
                 const logo = logoMap[(p.team || '').toUpperCase()];
@@ -604,13 +635,13 @@
                             </div>
                         </td>
                         <td class="text-center stat-val opacity-40 col-gp" style="font-weight: 900;">${p.gp}</td>
-                        <td class="text-center stat-val text-blue-600 col-stat" style="font-weight: 900;">${p.xg_gp.toFixed(2)}</td>
-                        <td class="text-center stat-val opacity-60 col-stat" style="font-weight: 900;">${p.dsa_gp.toFixed(2)}</td>
-                        <td class="text-center stat-val opacity-60 col-stat" style="font-weight: 900;">${p.goals_gp.toFixed(2)}</td>
-                        <td class="text-center stat-val text-purple-600 col-stat" style="font-weight: 900;">${p.oi_xg_gp.toFixed(2)}</td>
-                        <td class="text-center stat-val text-purple-400 opacity-60 col-stat" style="font-weight: 900;">${p.oi_dsa_gp.toFixed(2)}</td>
-                        <td class="text-center stat-val opacity-60 col-stat" style="font-weight: 900;">${p.assists_gp.toFixed(2)}</td>
-                    </tr>
+    <td class="text-center stat-val text-blue-600 col-stat" style="font-weight: 900;">${formatStat(p.xg_gp, p.xg_gp_rank)}</td>
+    <td class="text-center stat-val opacity-60 col-stat" style="font-weight: 900;">${formatStat(p.dsa_gp, p.dsa_gp_rank)}</td>
+    <td class="text-center stat-val opacity-60 col-stat" style="font-weight: 900;">${formatStat(p.goals_gp, p.goals_gp_rank)}</td>
+    <td class="text-center stat-val text-purple-600 col-stat" style="font-weight: 900;">${formatStat(p.oi_xg_gp, p.oi_xg_gp_rank)}</td>
+    <td class="text-center stat-val text-purple-400 opacity-60 col-stat" style="font-weight: 900;">${formatStat(p.oi_dsa_gp, p.oi_dsa_gp_rank)}</td>
+    <td class="text-center stat-val opacity-60 col-stat" style="font-weight: 900;">${formatStat(p.assists_gp, p.assists_gp_rank)}</td>
+</tr>
                 `;
             }).join('');
 
@@ -647,15 +678,24 @@
         }
 
         function renderCompareHeader(container) {
-            container.innerHTML = `
-                <h2 class="page-title">COMPARE SKATERS</h2>
-                <div class="flex flex-col items-center mb-6 md:mb-10 pb-4 md:pb-6 border-b border-gray-50 gap-2">
-                    <p class="text-[8px] md:text-[10px] text-gray-400 font-black uppercase tracking-widest text-center max-w-xl leading-relaxed">
-                        ALL DATA EXCLUDE EMPTY NETS<br>
-                        ALL ON-ICE DATA EXCLUDE THE SKATER'S OWN XG AND DSA
-                    </p>
-                </div>`;
-        }
+    container.innerHTML = `
+        <h2 class="page-title mb-4">COMPARE SKATERS</h2>
+        
+        <!-- THINNER SLIDER ADDED TO COMPARE TAB -->
+        <div class="flex justify-center mb-6">
+            <div class="bg-white p-0.5 rounded-full border border-gray-200 shadow-sm inline-flex">
+                <button onclick="toggleLeadersMode('values')" class="px-5 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest transition-all ${leadersDisplayMode === 'values' ? 'bg-[#001F3F] text-white shadow-md' : 'text-gray-400 hover:text-[#001F3F]'}">Values</button>
+                <button onclick="toggleLeadersMode('ranks')" class="px-5 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest transition-all ${leadersDisplayMode === 'ranks' ? 'bg-[#001F3F] text-white shadow-md' : 'text-gray-400 hover:text-[#001F3F]'}">Ranks</button>
+            </div>
+        </div>
+
+        <div class="flex flex-col items-center mb-6 md:mb-10 pb-4 md:pb-6 border-b border-gray-50 gap-2">
+            <p class="text-[8px] md:text-[10px] text-gray-400 font-black uppercase tracking-widest text-center max-w-xl leading-relaxed">
+                ALL DATA EXCLUDE EMPTY NETS<br>
+                ALL ON-ICE DATA EXCLUDE THE SKATER'S OWN XG AND DSA
+            </p>
+        </div>`;
+}
 
         function getCompareBadgeColor(val, min, max, activeCount) {
             if (activeCount < 2 || max === min) return '#ffffff';
@@ -684,6 +724,7 @@
             
             const activeSkaters = selectedCompareSkaters.map(sid => statsData.find(s => s.statsId === sid)).filter(Boolean);
             const activeCount = activeSkaters.length;
+            const isRanks = leadersDisplayMode === 'ranks';
 
             const getStatsRange = (key) => {
                 if (activeCount === 0) return { min: 0, max: 0 };
@@ -732,10 +773,21 @@
                         </td>
                         <td class="text-center stat-val opacity-40 col-gp" style="font-weight: 900;">${p ? p.gp : '0'}</td>
                         ${['xg_gp', 'dsa_gp', 'goals_gp', 'oi_xg_gp', 'oi_dsa_gp', 'assists_gp'].map(key => {
-                            const val = p ? p[key] : 0;
-                            const color = p ? getCompareBadgeColor(val, ranges[key].min, ranges[key].max, activeCount) : '#ffffff';
-                            return `<td class="text-center col-stat"><span class="compare-stat-badge" style="background-color: ${color}">${p ? val.toFixed(2) : '0.00'}</span></td>`;
-                        }).join('')}
+    const val = p ? p[key] : 0;
+    const rank = p ? p[key + '_rank'] : 0;
+    
+    // Remove the !isRanks condition so it always calculates the color using the underlying value
+    const color = p ? getCompareBadgeColor(val, ranges[key].min, ranges[key].max, activeCount) : '#ffffff';
+    
+    let displayVal = '0.00';
+    if (p) {
+        displayVal = isRanks ? (rank > 0 ? rank : '-') : val.toFixed(2);
+    } else if (isRanks) {
+        displayVal = '-';
+    }
+    
+    return `<td class="text-center col-stat"><span class="compare-stat-badge" style="background-color: ${color}">${displayVal}</span></td>`;
+}).join('')}
                     </tr>
                 `;
             }).join('');
