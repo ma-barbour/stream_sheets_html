@@ -287,6 +287,7 @@
                 <button onclick="switchPage('xg')" id="btn-xg" class="whitespace-nowrap px-2.5 py-1.5 md:px-4 md:py-2 rounded-lg md:rounded-xl text-[8px] md:text-[10px] font-black uppercase tracking-widest transition-all">TEAM xG</button>
                 <button onclick="switchPage('schedule')" id="btn-schedule" class="whitespace-nowrap px-2.5 py-1.5 md:px-4 md:py-2 rounded-lg md:rounded-xl text-[8px] md:text-[10px] font-black uppercase tracking-widest transition-all">SCHEDULE</button>
                 <button onclick="switchPage('gamelogs')" id="btn-gamelogs" class="whitespace-nowrap px-2.5 py-1.5 md:px-4 md:py-2 rounded-lg md:rounded-xl text-[8px] md:text-[10px] font-black uppercase tracking-widest transition-all">GAME LOGS</button>
+                <button onclick="switchPage('data')" id="btn-data" class="whitespace-nowrap px-2.5 py-1.5 md:px-4 md:py-2 rounded-lg md:rounded-xl text-[8px] md:text-[10px] font-black uppercase tracking-widest transition-all">DATA</button>
             </div>
         </nav>
 
@@ -505,7 +506,7 @@
 
         function switchPage(page) {
             activePage = page;
-            const btns = { leaders: 'btn-leaders', compare: 'btn-compare', xg: 'btn-xg', schedule: 'btn-schedule', gamelogs: 'btn-gamelogs' };
+            const btns = { leaders: 'btn-leaders', compare: 'btn-compare', xg: 'btn-xg', schedule: 'btn-schedule', gamelogs: 'btn-gamelogs', data: 'btn-data' };
             const activeClasses = ['bg-[#001F3F]', 'text-white', 'shadow-lg'];
             const inactiveClasses = ['text-gray-400', 'hover:bg-gray-100'];
 
@@ -551,6 +552,9 @@
             } else if (activePage === 'gamelogs') {
                 renderGameLogsHeader(headerContainer);
                 renderGameLogsPage(contentContainer);
+            } else if (activePage === 'data') {
+                renderDataHeader(headerContainer);
+                renderDataPage(contentContainer);
             }
         }
 
@@ -1135,6 +1139,97 @@
             }).join('');
             
             section.innerHTML = legend + xAxisTitle + `<div>${rows}</div>`;
+            container.appendChild(section);
+        }
+        
+        function renderDataHeader(container) {
+            container.innerHTML = `
+                <h2 class="page-title">DATA & GLOSSARY</h2>
+                <div class="flex flex-col items-center gap-2">
+                    <p class="text-[8px] md:text-[10px] text-gray-400 font-black uppercase tracking-widest text-center max-w-xl leading-relaxed">
+                        UNDERSTANDING THE 18 SKATERS METRICS AND MODELS
+                    </p>
+                </div>`;
+        }
+
+        function renderDataPage(container) {
+            const section = document.createElement('section');
+            section.className = "bg-white rounded-3xl md:rounded-[3rem] shadow-2xl shadow-gray-200/40 border border-gray-50 p-6 md:p-12 relative animate-fade-in";
+            
+            section.innerHTML = `
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12">
+                    
+                    <!-- GLOSSARY SECTION -->
+                    <div class="flex flex-col gap-4">
+                        <h3 class="text-[10px] md:text-[12px] font-black tracking-[0.2em] text-[#001F3F] border-b-2 border-[#001F3F] pb-2 mb-2 uppercase">Metrics Glossary</h3>
+                        
+                        <div class="flex flex-col gap-3">
+                            <!-- Yellow Category (xG, DSA, G) -->
+                            <div class="bg-[#FFEE00] p-4 rounded-2xl shadow-sm text-[#001F3F]">
+                                <div class="font-black text-sm uppercase tracking-wide">xG / GP</div>
+                                <div class="text-[10px] md:text-xs font-bold text-[#001F3F]/85 mt-1">Expected goals per game.</div>
+                            </div>
+                            <div class="bg-[#FFEE00] p-4 rounded-2xl shadow-sm text-[#001F3F]">
+                                <div class="font-black text-sm uppercase tracking-wide">DSA / GP</div>
+                                <div class="text-[10px] md:text-xs font-bold text-[#001F3F]/85 mt-1">Dangerous shot attempts per game.</div>
+                            </div>
+                            <div class="bg-[#FFEE00] p-4 rounded-2xl shadow-sm text-[#001F3F]">
+                                <div class="font-black text-sm uppercase tracking-wide">G / GP</div>
+                                <div class="text-[10px] md:text-xs font-bold text-[#001F3F]/85 mt-1">Goals per game <span class="italic text-[#001F3F]/65">(excludes empty net goals)</span>.</div>
+                            </div>
+
+                            <!-- Purple Category (OI xG, OI DSA, A) -->
+                            <div class="bg-[#9D00FF] p-4 rounded-2xl shadow-sm text-white">
+                                <div class="font-black text-sm uppercase tracking-wide">OI xG / GP</div>
+                                <div class="text-[10px] md:text-xs font-bold text-white/90 mt-1">On-ice expected goals per game <span class="italic text-white/70">(excludes the skater's own xG)</span>.</div>
+                            </div>
+                            <div class="bg-[#9D00FF] p-4 rounded-2xl shadow-sm text-white">
+                                <div class="font-black text-sm uppercase tracking-wide">OI DSA / GP</div>
+                                <div class="text-[10px] md:text-xs font-bold text-white/90 mt-1">On-ice dangerous shot attempts per game <span class="italic text-white/70">(excludes the skater's own DSA)</span>.</div>
+                            </div>
+                            <div class="bg-[#9D00FF] p-4 rounded-2xl shadow-sm text-white">
+                                <div class="font-black text-sm uppercase tracking-wide">A / GP</div>
+                                <div class="text-[10px] md:text-xs font-bold text-white/90 mt-1">Assists per game <span class="italic text-white/70">(excludes empty nets)</span>.</div>
+                            </div>
+
+                            <!-- Dark Blue Category (GP, TOI, PP %) -->
+                            <div class="bg-[#334155] p-4 rounded-2xl shadow-sm text-white">
+                                <div class="font-black text-sm uppercase tracking-wide">GP</div>
+                                <div class="text-[10px] md:text-xs font-bold text-white/90 mt-1">Games played during the tracked period.</div>
+                            </div>
+                            <div class="bg-[#334155] p-4 rounded-2xl shadow-sm text-white">
+                                <div class="font-black text-sm uppercase tracking-wide">TOI</div>
+                                <div class="text-[10px] md:text-xs font-bold text-white/90 mt-1">All-strengths time-on-ice.</div>
+                            </div>
+                            <div class="bg-[#334155] p-4 rounded-2xl shadow-sm text-white">
+                                <div class="font-black text-sm uppercase tracking-wide">PP %</div>
+                                <div class="text-[10px] md:text-xs font-bold text-white/90 mt-1">Percentage of the team's power play.</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- NOTES SECTION -->
+                    <div class="flex flex-col gap-4">
+                        <h3 class="text-[10px] md:text-[12px] font-black tracking-[0.2em] text-[#001F3F] border-b-2 border-[#001F3F] pb-2 mb-2 uppercase">Important Notes</h3>
+                        
+                        <div class="flex flex-col gap-4 bg-gray-50/70 p-5 md:p-6 rounded-2xl border border-gray-100">
+                            <p class="text-xs font-bold text-gray-600 leading-relaxed">
+                                • <strong class="text-[#001F3F]">Expected goals (xG)</strong> are from the 18 Skaters xG model and are adjusted to reflect shooting talent. Note: this xG model is based on actual shots-on-goal. For the quality of other shot attempts, see DSAs.
+                            </p>
+                            <p class="text-xs font-bold text-gray-600 leading-relaxed">
+                                • <strong class="text-[#001F3F]">Dangerous shot attempts (DSA)</strong> are from another 18 Skaters xG model that tracks all shot attempts. Approximately the top 40% of shot attempts are categorized as "dangerous". DSAs capture roughly 75% of goals.
+                            </p>
+                            <p class="text-xs font-bold text-gray-600 leading-relaxed">
+                                • All ranks are split by position (F|D).
+                            </p>
+                            <p class="text-xs font-bold text-gray-600 leading-relaxed">
+                                • All raw data were pulled from the NHL's API.
+                            </p>
+                        </div>
+                    </div>
+                    
+                </div>
+            `;
             container.appendChild(section);
         }
 
