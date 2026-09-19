@@ -761,7 +761,7 @@
                                 <div class="overflow-y-auto no-scrollbar flex flex-col gap-1">
                                     <button onclick="updateCompareSkater(${i}, '')" class="px-4 py-3 rounded-xl text-xs font-black text-red-500 hover:bg-red-50 transition-all text-center uppercase tracking-wider">Clear Row</button>
                                     ${statsData.map(s => `
-                                        <button onclick="updateCompareSkater(${i}, '${s.statsId}')" data-name="${s.skater}" class="compare-option-${i} flex flex-col items-center justify-center gap-0.5 px-4 py-3 rounded-2xl text-sm font-black transition-all ${s.statsId === sid ? 'bg-blue-50 text-[#001F3F]' : 'hover:bg-gray-50 text-gray-500'}">
+                                        <button onclick="updateCompareSkater(${i}, this.dataset.id)" data-name="${s.skater}" data-id="${s.statsId}" class="compare-option-${i} flex flex-col items-center justify-center gap-0.5 px-4 py-3 rounded-2xl text-sm font-black transition-all ${s.statsId === sid ? 'bg-blue-50 text-[#001F3F]' : 'hover:bg-gray-50 text-gray-500'}">
                                             <span class="uppercase tracking-wider text-center">${s.skater}</span>
                                             <span class="text-[10px] opacity-60 text-center">${s.pos} • ${s.team}</span>
                                         </button>
@@ -1094,7 +1094,7 @@
                             </div>
                             <div class="overflow-y-auto no-scrollbar flex flex-col gap-1">
                                 ${skaterList.map(s => `
-                                    <button onclick="selectSkater('${s.name}', '${s.id}')" data-name="${s.name}" class="skater-option flex items-center gap-4 px-4 py-3 rounded-2xl text-sm font-black transition-all ${s.id === currentSkaterId ? 'bg-blue-50 text-[#001F3F]' : 'hover:bg-gray-50 text-gray-500'}">
+                                    <button onclick="selectSkater(this.dataset.name, this.dataset.id)" data-name="${s.name}" data-id="${s.id}" class="skater-option flex items-center gap-4 px-4 py-3 rounded-2xl text-sm font-black transition-all ${s.id === currentSkaterId ? 'bg-blue-50 text-[#001F3F]' : 'hover:bg-gray-50 text-gray-500'}">
                                         ${logoMap[s.team] ? `<img src="${logoMap[s.team]}" class="w-10 h-10 object-contain">` : `<div class="w-10 h-10 bg-gray-100 rounded-lg"></div>`}
                                         <div class="flex flex-col items-start leading-tight">
                                             <span class="uppercase tracking-wider">${s.name}</span>
