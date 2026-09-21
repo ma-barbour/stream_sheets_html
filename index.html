@@ -98,6 +98,33 @@
         @media (min-width: 640px) { .skater-name { font-size: 15px; height: 52px; line-height: 1.2; } }
         
         .rounded-end { border-top-right-radius: 12px; border-bottom-right-radius: 12px; }
+        
+        /* Big Picture Rank Bars */
+        .bp-bar-bg {
+            background-color: #f1f5f9;
+            height: 24px;
+            border-radius: 6px;
+            position: relative;
+            display: flex;
+            align-items: center;
+            padding: 0 8px;
+            margin-bottom: 4px;
+        }
+        .bp-bar-fill {
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            border-radius: 6px;
+            transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 1;
+        }
+        .bp-bar-text {
+            position: relative;
+            z-index: 10;
+            font-size: 10px;
+            font-weight: 900;
+        }
 
         /* General UI components */
         nav { height: 64px; }
@@ -287,6 +314,7 @@
                 <button onclick="switchPage('xg')" id="btn-xg" class="whitespace-nowrap px-2.5 py-1.5 md:px-4 md:py-2 rounded-lg md:rounded-xl text-[8px] md:text-[10px] font-black uppercase tracking-widest transition-all">TEAM xG</button>
                 <button onclick="switchPage('compare')" id="btn-compare" class="whitespace-nowrap px-2.5 py-1.5 md:px-4 md:py-2 rounded-lg md:rounded-xl text-[8px] md:text-[10px] font-black uppercase tracking-widest transition-all">COMPARE</button>
                 <button onclick="switchPage('gamelogs')" id="btn-gamelogs" class="whitespace-nowrap px-2.5 py-1.5 md:px-4 md:py-2 rounded-lg md:rounded-xl text-[8px] md:text-[10px] font-black uppercase tracking-widest transition-all">GAME LOGS</button>
+                <button onclick="switchPage('bigpicture')" id="btn-bigpicture" class="whitespace-nowrap px-2.5 py-1.5 md:px-4 md:py-2 rounded-lg md:rounded-xl text-[8px] md:text-[10px] font-black uppercase tracking-widest transition-all">BIG PICTURE</button>
                 <button onclick="switchPage('data')" id="btn-data" class="whitespace-nowrap px-2.5 py-1.5 md:px-4 md:py-2 rounded-lg md:rounded-xl text-[8px] md:text-[10px] font-black uppercase tracking-widest transition-all">DATA</button>
             </div>
         </nav>
@@ -314,6 +342,8 @@
         const YAHOO_PROXY_URL = 'https://script.google.com/macros/s/AKfycbyn8fgbeXC-2eill36GxI6Tfema-2bRUe99OPs4b13O_Bp8hsRy2DUhCwNKDTXP-OJZ0Q/exec';
 
         let statsData = [];
+        let fullSeasonData = [];
+        let hitsBlocksData = [];
         let scheduleData = { headers: [], rows: [] };
         let gameLogsData = [];
         let ppDataMap = {}; 
@@ -323,6 +353,8 @@
         let currentTeam = 'ANA';
         let currentSkater = '';
         let currentSkaterId = '';
+        let currentBPSkater = '';
+        let currentBPSkaterId = '';
         let currentPosition = 'ALL';
         let activePage = 'leaders';
         let scheduleVisibleDays = 15;
@@ -476,6 +508,71 @@
                 
                 dataFetchStatus.schedule = true;
                 dataFetchStatus.gameLogs = true;
+                
+                // Helper to safely find JSON keys regardless of R's capitalization
+                const getField = (obj, candidates) => {
+                    const keys = Object.keys(obj);
+                    const kLower = keys.map(k => k.toLowerCase());
+                    for (let c of candidates) {
+                        const idx = kLower.indexOf(c);
+                        if (idx !== -1) return obj[keys[idx]];
+                    }
+                    return Object.values(obj)[0]; // Fallback to first column if missing
+                };
+
+                // 7. Process Full Season Data
+                // 7. Process Full Season Data
+                if (jsonData.full_season) {
+                    fullSeasonData = jsonData.full_season.map(row => ({
+                        statsId: String(getField(row, ['key', 'skater_id', 'statsid'])),
+                        gp: parseInt(getField(row, ['gp', 'games_played'])) || 0,
+                        toi_gp: parseFloat(getField(row, ['toi_gp', 'toi/gp'])) || 0,
+                        goals: parseInt(getField(row, ['goals', 'g'])) || 0,
+                        assists: parseInt(getField(row, ['assists', 'a'])) || 0,
+                        shots: parseInt(getField(row, ['shots', 'sog'])) || 0,
+                        
+                        // Individual xG
+                        xg: parseFloat(getField(row, ['xg'])) || 0,
+                        xg_rank: parseInt(getField(row, ['xg_rank'])) || 0,
+                        xg_gp: parseFloat(getField(row, ['xg_gp', 'xg/gp'])) || 0,
+                        xg_gp_rank: parseInt(getField(row, ['xg_gp_rank'])) || 0,
+                        xg_hour: parseFloat(getField(row, ['xg_hour', 'xg_per_hour', 'xg/60'])) || 0,
+                        xg_hour_rank: parseInt(getField(row, ['xg_hour_rank'])) || 0,
+                        
+                        // Individual DSA
+                        dsa: parseFloat(getField(row, ['dsa'])) || 0,
+                        dsa_rank: parseInt(getField(row, ['dsa_rank'])) || 0,
+                        dsa_gp: parseFloat(getField(row, ['dsa_gp', 'dsa/gp'])) || 0,
+                        dsa_gp_rank: parseInt(getField(row, ['dsa_gp_rank'])) || 0,
+                        dsa_hour: parseFloat(getField(row, ['dsa_hour', 'dsa_per_hour', 'dsa/60'])) || 0,
+                        dsa_hour_rank: parseInt(getField(row, ['dsa_hour_rank'])) || 0,
+
+                        // On-Ice xG
+                        oi_xg: parseFloat(getField(row, ['oi_xg'])) || 0,
+                        oi_xg_rank: parseInt(getField(row, ['oi_xg_rank'])) || 0,
+                        oi_xg_gp: parseFloat(getField(row, ['oi_xg_gp'])) || 0,
+                        oi_xg_gp_rank: parseInt(getField(row, ['oi_xg_gp_rank'])) || 0,
+                        oi_xg_hour: parseFloat(getField(row, ['oi_xg_hour'])) || 0,
+                        oi_xg_hour_rank: parseInt(getField(row, ['oi_xg_hour_rank'])) || 0,
+
+                        // On-Ice DSA
+                        oi_dsa: parseFloat(getField(row, ['oi_dsa'])) || 0,
+                        oi_dsa_rank: parseInt(getField(row, ['oi_dsa_rank'])) || 0,
+                        oi_dsa_gp: parseFloat(getField(row, ['oi_dsa_gp'])) || 0,
+                        oi_dsa_gp_rank: parseInt(getField(row, ['oi_dsa_gp_rank'])) || 0,
+                        oi_dsa_hour: parseFloat(getField(row, ['oi_dsa_hour'])) || 0,
+                        oi_dsa_hour_rank: parseInt(getField(row, ['oi_dsa_hour_rank'])) || 0
+                    }));
+                }
+
+                // 8. Process Hits & Blocks Data
+                if (jsonData.hits_blocks) {
+                    hitsBlocksData = jsonData.hits_blocks.map(row => ({
+                        statsId: String(getField(row, ['key', 'skater_id', 'statsid'])),
+                        hits_gp: parseFloat(getField(row, ['hits_gp', 'hit_gp', 'hit/gp'])) || 0,
+                        blocks_gp: parseFloat(getField(row, ['blocks_gp', 'blk_gp', 'blk/gp'])) || 0
+                    }));
+                }
 
                 // PRE-LOAD Current Skater with Top Leader
                 let leadersSorted = [...statsData].sort((a, b) => {
@@ -506,7 +603,7 @@
 
         function switchPage(page) {
             activePage = page;
-            const btns = { leaders: 'btn-leaders', compare: 'btn-compare', xg: 'btn-xg', schedule: 'btn-schedule', gamelogs: 'btn-gamelogs', data: 'btn-data' };
+            const btns = { leaders: 'btn-leaders', compare: 'btn-compare', xg: 'btn-xg', schedule: 'btn-schedule', gamelogs: 'btn-gamelogs', bigpicture: 'btn-bigpicture', data: 'btn-data' };
             const activeClasses = ['bg-[#001F3F]', 'text-white', 'shadow-lg'];
             const inactiveClasses = ['text-gray-400', 'hover:bg-gray-100'];
 
@@ -555,6 +652,9 @@
             } else if (activePage === 'data') {
                 renderDataHeader(headerContainer);
                 renderDataPage(contentContainer);
+            } else if (activePage === 'bigpicture') {
+                renderBigPictureHeader(headerContainer);
+                renderBigPicturePage(contentContainer);
             }
         }
 
@@ -1170,8 +1270,16 @@
                                 <div class="text-[10px] md:text-xs font-bold text-[#001F3F]/85 mt-1">Expected goals per game.</div>
                             </div>
                             <div class="bg-[#FFEE00] p-4 rounded-2xl shadow-sm text-[#001F3F]">
+                                <div class="font-black text-sm uppercase tracking-wide">xG / HOUR</div>
+                                <div class="text-[10px] md:text-xs font-bold text-[#001F3F]/85 mt-1">Expected goals per 60 minutes of TOI.</div>
+                            </div>
+                            <div class="bg-[#FFEE00] p-4 rounded-2xl shadow-sm text-[#001F3F]">
                                 <div class="font-black text-sm uppercase tracking-wide">DSA / GP</div>
                                 <div class="text-[10px] md:text-xs font-bold text-[#001F3F]/85 mt-1">Dangerous shot attempts per game.</div>
+                            </div>
+                            <div class="bg-[#FFEE00] p-4 rounded-2xl shadow-sm text-[#001F3F]">
+                                <div class="font-black text-sm uppercase tracking-wide">DSA / HOUR</div>
+                                <div class="text-[10px] md:text-xs font-bold text-[#001F3F]/85 mt-1">Dangerous shot attempts per 60 minutes of TOI.</div>
                             </div>
                             <div class="bg-[#FFEE00] p-4 rounded-2xl shadow-sm text-[#001F3F]">
                                 <div class="font-black text-sm uppercase tracking-wide">G / GP</div>
@@ -1184,8 +1292,16 @@
                                 <div class="text-[10px] md:text-xs font-bold text-white/90 mt-1">On-ice expected goals per game <span class="italic text-white/70">(excludes the skater's own xG)</span>.</div>
                             </div>
                             <div class="bg-[#9D00FF] p-4 rounded-2xl shadow-sm text-white">
+                                <div class="font-black text-sm uppercase tracking-wide">OI xG / HOUR</div>
+                                <div class="text-[10px] md:text-xs font-bold text-white/90 mt-1">On-ice expected goals per 60 minutes of TOI <span class="italic text-white/70">(excludes the skater's own xG)</span>.</div>
+                            </div>
+                            <div class="bg-[#9D00FF] p-4 rounded-2xl shadow-sm text-white">
                                 <div class="font-black text-sm uppercase tracking-wide">OI DSA / GP</div>
                                 <div class="text-[10px] md:text-xs font-bold text-white/90 mt-1">On-ice dangerous shot attempts per game <span class="italic text-white/70">(excludes the skater's own DSA)</span>.</div>
+                            </div>
+                            <div class="bg-[#9D00FF] p-4 rounded-2xl shadow-sm text-white">
+                                <div class="font-black text-sm uppercase tracking-wide">OI DSA / HOUR</div>
+                                <div class="text-[10px] md:text-xs font-bold text-white/90 mt-1">On-ice dangerous shot attempts per 60 minutes of TOI <span class="italic text-white/70">(excludes the skater's own DSA)</span>.</div>
                             </div>
                             <div class="bg-[#9D00FF] p-4 rounded-2xl shadow-sm text-white">
                                 <div class="font-black text-sm uppercase tracking-wide">A / GP</div>
@@ -1246,6 +1362,286 @@
         function selectPosition(pos) { currentPosition = pos; renderContent(); }
         function selectSkater(name, id) { currentSkater = name; currentSkaterId = id; renderContent(); }
         function handleDaysChange(val) { scheduleVisibleDays = parseInt(val); renderContent(); }
+        
+        function selectBPSkater(name, id) {
+            currentBPSkater = name;
+            currentBPSkaterId = id;
+            renderContent();
+        }
+
+        function filterBPSkaters(e) {
+            const query = e.target.value.toLowerCase();
+            const items = document.querySelectorAll('.bp-skater-option');
+            items.forEach(item => {
+                const name = item.dataset.name.toLowerCase();
+                item.style.display = name.includes(query) ? 'flex' : 'none';
+            });
+        }
+
+        // Smoothly interpolates from Red (0%) to Grey (50%) to Blue (100%)
+        function getBPBarColor(pct) {
+            let r, g, b;
+            if (pct < 0.5) {
+                const p = pct * 2; 
+                r = Math.round(239 + (203 - 239) * p);
+                g = Math.round(68 + (213 - 68) * p);
+                b = Math.round(68 + (225 - 68) * p);
+            } else {
+                const p = (pct - 0.5) * 2;
+                r = Math.round(203 + (59 - 203) * p);
+                g = Math.round(213 + (130 - 213) * p);
+                b = Math.round(225 + (246 - 225) * p);
+            }
+            return `rgb(${r}, ${g}, ${b})`;
+        }
+
+        // Safely computes max rank by dynamically looking up the skater's true position
+        function getMaxRank(dataset, metricKey, skaterPos) {
+            if (!dataset || dataset.length === 0) return 1;
+            const isDef = ['D', 'DEF'].includes((skaterPos || '').toUpperCase());
+            
+            let max = 0;
+            dataset.forEach(row => {
+                let rowPos = row.pos;
+                // If position is missing in the dataset (like fullSeasonData), look it up globally
+                if (!rowPos) {
+                    const match = skaterList.find(s => s.id === row.statsId);
+                    if (match) rowPos = match.pos;
+                }
+                const isRowDef = ['D', 'DEF'].includes((rowPos || '').toUpperCase());
+                if (isDef === isRowDef) {
+                    const rank = parseInt(row[metricKey]) || 0;
+                    if (rank > max) max = rank;
+                }
+            });
+            return max > 0 ? max : 1;
+        }
+
+        function renderBigPictureHeader(container) {
+            // Check if Full Season data exists
+            if (!fullSeasonData || fullSeasonData.length === 0) {
+                container.innerHTML = `<h2 class="page-title">THE BIG PICTURE</h2><div class="mt-8 text-center text-[10px] font-black uppercase text-gray-400">Awaiting Full Season Data...</div>`;
+                return;
+            }
+
+            // Auto-select the first available skater if none is selected yet
+            if (!currentBPSkaterId) {
+                currentBPSkaterId = fullSeasonData[0].statsId;
+                const match = skaterList.find(s => s.id === currentBPSkaterId);
+                currentBPSkater = match ? match.name : 'Select Skater';
+            }
+
+            // Build a filtered skater list: ONLY skaters that exist in fullSeasonData
+            const bpSkatersList = skaterList.filter(s => fullSeasonData.some(fs => fs.statsId === s.id));
+            const skaterInfo = skaterList.find(s => s.id === currentBPSkaterId) || {};
+
+            container.innerHTML = `
+                <h2 class="page-title">THE BIG PICTURE</h2>
+                <div class="page-timestamp mt-1">MINIMUM GAMES PLAYED FILTER APPLIED</div>
+                <div class="flex justify-center mt-4">
+                    <div class="relative w-full max-w-sm">
+                        <button onclick="toggleDropdown()" id="skater-select-btn" class="w-full flex items-center justify-between px-6 md:px-8 py-4 md:py-5 bg-white border-2 border-gray-100 rounded-full md:rounded-[2.5rem] hover:border-blue-100 transition-all shadow-xl shadow-gray-200/40 group">
+                            <div class="flex items-center gap-3 md:gap-4">
+                                ${skaterInfo.team && logoMap[skaterInfo.team] ? `<img src="${logoMap[skaterInfo.team]}" class="w-10 h-10 md:w-16 md:h-16 object-contain">` : `<div class="w-10 h-10 md:w-16 md:h-16 bg-blue-50 text-[#001F3F] rounded-xl flex items-center justify-center text-lg md:text-xl font-black">?</div>`}
+                                <div class="flex flex-col items-start text-left">
+                                    <span class="text-[8px] md:text-[9px] font-black text-gray-400 uppercase tracking-widest mb-0.5 opacity-60">Selected Profile</span>
+                                    <span class="font-black text-xl md:text-2xl tracking-tighter uppercase leading-tight text-[#001F3F]">${currentBPSkater}</span>
+                                    <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">${skaterInfo.pos || ''} • ${skaterInfo.team || ''}</span>
+                                </div>
+                            </div>
+                            <svg class="w-5 h-5 md:w-6 md:h-6 text-gray-300 group-hover:text-[#001F3F] transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M19 9l-7 7-7-7"></path></svg>
+                        </button>
+                        <div id="main-dropdown" class="hidden absolute top-full left-0 right-0 mt-3 bg-white border border-gray-100 rounded-3xl shadow-2xl z-[100] max-h-96 overflow-hidden p-2 flex flex-col gap-1">
+                            <div class="px-2 pb-2 border-b border-gray-100 mb-1">
+                                <input type="text" placeholder="Search filtered skaters..." onclick="event.stopPropagation()" onkeyup="filterBPSkaters(event)" class="w-full px-4 py-2 bg-gray-50 border border-gray-100 rounded-xl text-xs font-bold outline-none focus:border-blue-200 transition-all">
+                            </div>
+                            <div class="overflow-y-auto no-scrollbar flex flex-col gap-1">
+                                ${bpSkatersList.map(s => `
+                                    <button onclick="selectBPSkater(this.dataset.name, this.dataset.id)" data-name="${s.name}" data-id="${s.id}" class="bp-skater-option flex items-center gap-4 px-4 py-3 rounded-2xl text-sm font-black transition-all ${s.id === currentBPSkaterId ? 'bg-blue-50 text-[#001F3F]' : 'hover:bg-gray-50 text-gray-500'}">
+                                        ${logoMap[s.team] ? `<img src="${logoMap[s.team]}" class="w-10 h-10 object-contain">` : `<div class="w-10 h-10 bg-gray-100 rounded-lg"></div>`}
+                                        <div class="flex flex-col items-start leading-tight">
+                                            <span class="uppercase tracking-wider">${s.name}</span>
+                                            <span class="text-[10px] opacity-60">${s.pos} •${s.team}</span>
+                                        </div>
+                                    </button>`).join('')}
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+        }
+
+        function renderBigPicturePage(container) {
+            if (!fullSeasonData || fullSeasonData.length === 0) return;
+            const section = document.createElement('section');
+            section.className = "bg-white rounded-3xl md:rounded-[3rem] shadow-2xl shadow-gray-200/40 border border-gray-50 p-6 md:p-12 relative animate-fade-in";
+
+            const skaterInfo = skaterList.find(s => s.id === currentBPSkaterId) || {};
+            const fs = fullSeasonData.find(s => s.statsId === currentBPSkaterId) || {};
+            const l2w = statsData.find(s => s.statsId === currentBPSkaterId) || {};
+            const hb = hitsBlocksData.find(s => s.statsId === currentBPSkaterId) || {};
+
+            const idMatch = currentBPSkaterId.match(/\d+$/);
+            const nhlId = idMatch ? idMatch[0] : '';
+            const mugshotUrl = nhlId ? `https://assets.nhle.com/mugs/nhl/latest/${nhlId}.png` : '';
+            const teamLogo = logoMap[(skaterInfo.team || '').toUpperCase()];
+
+            // Points Math
+            const fs_points = (fs.goals || 0) + (fs.assists || 0);
+            const pace84_goals = fs.gp > 0 ? ((fs.goals / fs.gp) * 84).toFixed(1) : '0.0';
+            const pace84_assists = fs.gp > 0 ? ((fs.assists / fs.gp) * 84).toFixed(1) : '0.0';
+            const pace84_points = fs.gp > 0 ? ((fs_points / fs.gp) * 84).toFixed(1) : '0.0';
+
+            // Bar Builder Helper
+            const buildBar = (label, val, rank, maxRank) => {
+                if (!rank || rank === 0) {
+                    return `<div class="mb-3"><div class="flex justify-between text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1"><span>${label}</span><span>-</span></div><div class="bp-bar-bg"><span class="bp-bar-text text-gray-400">N/A</span></div></div>`;
+                }
+                const pct = Math.max(0, Math.min(1, 1 - ((rank - 1) / (maxRank - 1 || 1))));
+                const w = Math.max(4, pct * 100); 
+                const color = getBPBarColor(pct);
+                const textColor = pct >= 0.65 ? 'text-white' : 'text-[#001F3F]';
+
+                return `
+                    <div class="mb-3">
+                        <div class="flex justify-between items-end mb-1 px-1">
+                            <span class="text-[9px] font-black uppercase tracking-widest text-gray-400">${label}</span>
+                            <span class="text-[9px] font-black uppercase tracking-widest text-gray-500">Rank: ${rank}</span>
+                        </div>
+                        <div class="bp-bar-bg">
+                            <div class="bp-bar-fill" style="width: ${w}%; background-color: ${color};"></div>
+                            <span class="bp-bar-text ${textColor}">${val.toFixed(2)}</span>
+                        </div>
+                    </div>`;
+            };
+
+            // Calculate Max Ranks for the specific position dynamically
+            const l2w_max_xg_gp = getMaxRank(statsData, 'xg_gp_rank', skaterInfo.pos);
+            const l2w_max_dsa_gp = getMaxRank(statsData, 'dsa_gp_rank', skaterInfo.pos);
+            const l2w_max_oi_xg = getMaxRank(statsData, 'oi_xg_gp_rank', skaterInfo.pos);
+            const l2w_max_oi_dsa = getMaxRank(statsData, 'oi_dsa_gp_rank', skaterInfo.pos);
+
+            const fs_max_xg_gp = getMaxRank(fullSeasonData, 'xg_gp_rank', skaterInfo.pos);
+            const fs_max_dsa_gp = getMaxRank(fullSeasonData, 'dsa_gp_rank', skaterInfo.pos);
+            const fs_max_oi_xg_gp = getMaxRank(fullSeasonData, 'oi_xg_gp_rank', skaterInfo.pos);
+            const fs_max_oi_dsa_gp = getMaxRank(fullSeasonData, 'oi_dsa_gp_rank', skaterInfo.pos);
+
+            const fs_max_xg_hour = getMaxRank(fullSeasonData, 'xg_hour_rank', skaterInfo.pos);
+            const fs_max_dsa_hour = getMaxRank(fullSeasonData, 'dsa_hour_rank', skaterInfo.pos);
+            const fs_max_oi_xg_hour = getMaxRank(fullSeasonData, 'oi_xg_hour_rank', skaterInfo.pos);
+            const fs_max_oi_dsa_hour = getMaxRank(fullSeasonData, 'oi_dsa_hour_rank', skaterInfo.pos);
+
+            // Game Logs
+            let gameLogsHtml = '';
+            const skaterLogs = gameLogsData.filter(log => log.key === currentBPSkaterId).sort((a,b) => new Date(b.date) - new Date(a.date));
+            if (skaterLogs.length > 0) {
+                const maxTOI = Math.max(...skaterLogs.map(l => l.total), 1);
+                const legend = `<div class="flex flex-col items-center mb-6 border-b border-gray-50 pb-4 gap-3"><h3 class="text-[10px] md:text-xs font-black tracking-[0.2em] text-[#001F3F] uppercase">Recent Game Logs</h3><div class="flex flex-wrap justify-center items-center gap-4"><div class="flex items-center gap-2"><div class="w-3 h-3 bg-[#334155] rounded"></div><span class="text-[8px] font-black text-gray-400 uppercase">EV</span></div><div class="flex items-center gap-2"><div class="w-3 h-3 bg-[#FFEE00] rounded"></div><span class="text-[8px] font-black text-gray-400 uppercase">PP</span></div><div class="flex items-center gap-2"><div class="w-3 h-3 bg-[#ef4444] rounded"></div><span class="text-[8px] font-black text-gray-400 uppercase">SH</span></div><div class="flex items-center gap-2"><div class="w-3 h-3 bg-[#9D00FF] rounded"></div><span class="text-[8px] font-black text-gray-400 uppercase">OT</span></div></div></div>`;
+                const logsRows = skaterLogs.map(log => {
+                    const oppLogo = logoMap[log.opp.toUpperCase()], totalW = (log.total / maxTOI) * 100;
+                    const ppPerc = Math.round((ppDataMap[log.key] && ppDataMap[log.key][log.date]) || 0);
+                    const badgeClass = ppPerc >= 50 ? 'bg-[#FFEE00] border-yellow-400/50 animate-pp-pulse' : 'bg-gray-100 border-gray-200';
+                    return `<div class="log-row"><div class="flex items-center justify-start gap-0 md:gap-1"><img src="${teamLogo}" class="w-8 h-8 md:w-10 md:h-10 object-contain"><span class="text-[7px] font-black text-gray-300">vs</span><img src="${oppLogo}" class="w-8 h-8 md:w-10 md:h-10 object-contain"></div><div class="bar-container"><span class="absolute left-1.5 top-1/2 -translate-y-1/2 z-20 text-[8px] md:text-[10px] font-black text-white pointer-events-none drop-shadow-md whitespace-nowrap">${log.date.split('-').slice(1).join('/')}</span><div class="flex h-full overflow-hidden" style="width: ${totalW}%; border-radius: 6px;"><div class="bar-ev h-full" style="width: ${(log.ev / log.total) * 100}%"></div><div class="bar-pp h-full" style="width: ${(log.pp / log.total) * 100}%"></div><div class="bar-sh h-full" style="width: ${(log.sh / log.total) * 100}%"></div><div class="bar-ot h-full" style="width: ${(log.ot / log.total) * 100}%"></div></div></div><div class="flex items-center justify-center"><span class="text-[10px] md:text-[11px] font-black text-[#001F3F]">${decimalToMMSS(log.total)}</span></div><div class="flex items-center justify-center"><div class="px-2 py-1 rounded-lg shadow-sm border ${badgeClass}"><span class="text-[10px] md:text-[11px] font-black text-[#001F3F]">${ppPerc}%</span></div></div></div>`;
+                }).join('');
+                gameLogsHtml = `<div class="mt-8 pt-8 border-t border-gray-50">${legend}<div>${logsRows}</div></div>`;
+            }
+
+            section.innerHTML = `
+                <!-- Profile Header -->
+                <div class="flex flex-col md:flex-row items-center justify-center md:justify-start gap-6 mb-8 border-b border-gray-50 pb-8">
+                    <div class="w-24 h-24 md:w-32 md:h-32 bg-gray-50 rounded-full border-4 border-white shadow-lg overflow-hidden flex-shrink-0 flex items-end justify-center relative">
+                        <img src="${mugshotUrl}" class="w-full h-full object-cover object-center scale-[1.15] translate-y-1 md:translate-y-1.5" onerror="this.style.display='none'">
+                    </div>
+                    <div class="flex flex-col items-center md:items-start text-center md:text-left">
+                        <h2 class="text-2xl md:text-4xl font-black uppercase tracking-tighter text-[#001F3F]">${currentBPSkater}</h2>
+                        <div class="mt-1 text-xs md:text-sm font-black tracking-widest text-gray-400 uppercase">${fs.gp || 0} GP • ${decimalToMMSS((fs.toi_gp || 0) / 60)} ATOI</div>
+                    </div>
+                </div>
+
+                <!-- Points & Pace Grid -->
+                <div class="grid grid-cols-2 md:grid-cols-6 gap-3 mb-10">
+                    <div class="bg-[#001F3F] p-4 rounded-2xl flex flex-col items-center justify-center text-white shadow-md">
+                        <span class="text-[8px] font-black tracking-widest uppercase opacity-60 mb-1">Full Season</span>
+                        <span class="text-xl md:text-2xl font-black text-white">${fs.goals || 0}</span>
+                        <span class="text-[10px] font-black tracking-wider uppercase mt-1">Goals</span>
+                    </div>
+                    <div class="bg-[#001F3F] p-4 rounded-2xl flex flex-col items-center justify-center text-white shadow-md">
+                        <span class="text-[8px] font-black tracking-widest uppercase opacity-60 mb-1">Full Season</span>
+                        <span class="text-xl md:text-2xl font-black text-white">${fs.assists || 0}</span>
+                        <span class="text-[10px] font-black tracking-wider uppercase mt-1">Assists</span>
+                    </div>
+                    <div class="bg-[#001F3F] p-4 rounded-2xl flex flex-col items-center justify-center text-white shadow-md col-span-2 md:col-span-1">
+                        <span class="text-[8px] font-black tracking-widest uppercase opacity-60 mb-1">Full Season</span>
+                        <span class="text-xl md:text-2xl font-black text-white">${fs_points}</span>
+                        <span class="text-[10px] font-black tracking-wider uppercase mt-1">Points</span>
+                    </div>
+                    
+                    <div class="bg-[#FFEE00] p-4 rounded-2xl flex flex-col items-center justify-center text-[#001F3F] shadow-md">
+                        <span class="text-[8px] font-black tracking-widest uppercase opacity-60 mb-1">84-Game Pace</span>
+                        <span class="text-xl md:text-2xl font-black text-[#001F3F]">${pace84_goals}</span>
+                        <span class="text-[10px] font-black tracking-wider uppercase mt-1">Goals</span>
+                    </div>
+                    <div class="bg-[#FFEE00] p-4 rounded-2xl flex flex-col items-center justify-center text-[#001F3F] shadow-md">
+                        <span class="text-[8px] font-black tracking-widest uppercase opacity-60 mb-1">84-Game Pace</span>
+                        <span class="text-xl md:text-2xl font-black text-[#001F3F]">${pace84_assists}</span>
+                        <span class="text-[10px] font-black tracking-wider uppercase mt-1">Assists</span>
+                    </div>
+                    <div class="bg-[#FFEE00] p-4 rounded-2xl flex flex-col items-center justify-center text-[#001F3F] shadow-md col-span-2 md:col-span-1">
+                        <span class="text-[8px] font-black tracking-widest uppercase opacity-60 mb-1">84-Game Pace</span>
+                        <span class="text-xl md:text-2xl font-black text-[#001F3F]">${pace84_points}</span>
+                        <span class="text-[10px] font-black tracking-wider uppercase mt-1">Points</span>
+                    </div>
+                </div>
+
+                <!-- Rank Bars Grid -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8 mb-10 border border-gray-100 p-6 rounded-3xl bg-gray-50/30">
+                    
+                    <!-- Last 2 Weeks Bars -->
+                    <div class="flex flex-col gap-2">
+                        <h3 class="text-[10px] md:text-xs font-black tracking-[0.2em] text-[#001F3F] uppercase mb-2 border-b border-gray-200 pb-2">Last 2 Weeks (Per Game)</h3>
+                        ${buildBar('XG / GP', l2w.xg_gp || 0, l2w.xg_gp_rank, l2w_max_xg_gp)}
+                        ${buildBar('DSA / GP', l2w.dsa_gp || 0, l2w.dsa_gp_rank, l2w_max_dsa_gp)}
+                        ${buildBar('OI XG / GP', l2w.oi_xg_gp || 0, l2w.oi_xg_gp_rank, l2w_max_oi_xg)}
+                        ${buildBar('OI DSA / GP', l2w.oi_dsa_gp || 0, l2w.oi_dsa_gp_rank, l2w_max_oi_dsa)}
+                    </div>
+
+                    <!-- Full Season GP Bars -->
+                    <div class="flex flex-col gap-2">
+                        <h3 class="text-[10px] md:text-xs font-black tracking-[0.2em] text-[#001F3F] uppercase mb-2 border-b border-gray-200 pb-2">Full Season (Per Game)</h3>
+                        ${buildBar('XG / GP', fs.xg_gp || 0, fs.xg_gp_rank, fs_max_xg_gp)}
+                        ${buildBar('DSA / GP', fs.dsa_gp || 0, fs.dsa_gp_rank, fs_max_dsa_gp)}
+                        ${buildBar('OI XG / GP', fs.oi_xg_gp || 0, fs.oi_xg_gp_rank, fs_max_oi_xg_gp)}
+                        ${buildBar('OI DSA / GP', fs.oi_dsa_gp || 0, fs.oi_dsa_gp_rank, fs_max_oi_dsa_gp)}
+                    </div>
+
+                    <!-- Full Season Hour Bars -->
+                    <div class="flex flex-col gap-2">
+                        <h3 class="text-[10px] md:text-xs font-black tracking-[0.2em] text-[#001F3F] uppercase mb-2 border-b border-gray-200 pb-2">Full Season (Per Hour)</h3>
+                        ${buildBar('XG / HOUR', fs.xg_hour || 0, fs.xg_hour_rank, fs_max_xg_hour)}
+                        ${buildBar('DSA / HOUR', fs.dsa_hour || 0, fs.dsa_hour_rank, fs_max_dsa_hour)}
+                        ${buildBar('OI XG / HOUR', fs.oi_xg_hour || 0, fs.oi_xg_hour_rank, fs_max_oi_xg_hour)}
+                        ${buildBar('OI DSA / HOUR', fs.oi_dsa_hour || 0, fs.oi_dsa_hour_rank, fs_max_oi_dsa_hour)}
+                    </div>
+                </div>
+
+                <!-- Hits & Blocks Grid -->
+                <div class="grid grid-cols-2 gap-4 mb-8">
+                    <div class="bg-gray-50 border border-gray-200 p-4 rounded-2xl flex flex-col items-center justify-center shadow-sm">
+                        <span class="text-[8px] font-black tracking-widest uppercase text-gray-400 mb-1">LAST 2 WEEKS</span>
+                        <span class="text-xl md:text-2xl font-black text-[#001F3F]">${hb.hits_gp ? hb.hits_gp.toFixed(2) : '0.00'}</span>
+                        <span class="text-[10px] font-black tracking-wider uppercase mt-1 text-gray-500">HITS / GP</span>
+                    </div>
+                    <div class="bg-gray-50 border border-gray-200 p-4 rounded-2xl flex flex-col items-center justify-center shadow-sm">
+                        <span class="text-[8px] font-black tracking-widest uppercase text-gray-400 mb-1">LAST 2 WEEKS</span>
+                        <span class="text-xl md:text-2xl font-black text-[#001F3F]">${hb.blocks_gp ? hb.blocks_gp.toFixed(2) : '0.00'}</span>
+                        <span class="text-[10px] font-black tracking-wider uppercase mt-1 text-gray-500">BLOCKS / GP</span>
+                    </div>
+                </div>
+
+                <!-- Conditional Game Logs -->
+                ${gameLogsHtml}
+            `;
+            container.appendChild(section);
+        }
 
         window.onclick = e => { 
             const isSelectBtn = e.target.closest('#team-select-btn') || e.target.closest('#date-select-btn') || e.target.closest('#skater-select-btn') || e.target.closest('.compare-trigger');
