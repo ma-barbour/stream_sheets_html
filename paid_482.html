@@ -359,6 +359,7 @@
         let activePage = 'leaders';
         let scheduleVisibleDays = 15;
         let dataRangeText = '';
+        let leadersSortCol = 'xg_gp';
         
         let yahooLeagueId = '';
         let availablePlayers = null; 
@@ -448,7 +449,8 @@
                         assists_gp: parseFloat(row.assists_x_en_gp) || 0,
                         assists_gp_rank: parseInt(row.assists_x_en_gp_rank) || 0,
                         oi_dsa_gp: parseFloat(row.oi_dsa_gp) || 0,
-                        oi_dsa_gp_rank: parseInt(row.oi_dsa_gp_rank) || 0
+                        oi_dsa_gp_rank: parseInt(row.oi_dsa_gp_rank) || 0,
+                        shots_gp: parseFloat(row.shots_gp) || 0
                     }));
 
                     const sDate = jsonData.stats[0].start_date;
@@ -699,30 +701,62 @@
         </div>`;
 }
 
+        function setLeadersSort(col) {
+            leadersSortCol = col;
+            renderContent();
+        }
+
         function renderLeadersPage(container) {
             const section = document.createElement('section');
             section.className = "bg-white rounded-3xl md:rounded-[3rem] shadow-2xl shadow-gray-200/40 border border-gray-50 p-4 md:p-12 relative animate-fade-in";
             
-            let displayData = [...statsData].sort((a, b) => {
-                if (b.xg_gp !== a.xg_gp) return b.xg_gp - a.xg_gp;
-                if (b.dsa_gp !== a.dsa_gp) return b.dsa_gp - a.dsa_gp;
-                if (b.goals_gp !== a.goals_gp) return b.goals_gp - a.goals_gp;
-                return b.oi_xg_gp - a.oi_xg_gp;
-            });
+            let displayData = [...statsData];
 
             if (currentPosition === 'FORWARDS') {
                 displayData = displayData.filter(p => ['F','C','L','R','LW','RW'].includes((p.pos||'').toUpperCase()));
             } else if (currentPosition === 'DEFENDERS') {
                 displayData = displayData.filter(p => ['D','DEF'].includes((p.pos||'').toUpperCase()));
             }
-            
+
             const isRanks = leadersDisplayMode === 'ranks';
+
+            // Dynamic Sorting Logic
+            displayData.sort((a, b) => {
+                if (isRanks) {
+                    // Sort by Rank Ascending (1, 2, 3...)
+                    const rankKey = leadersSortCol + '_rank';
+                    const rankA = parseInt(a[rankKey]) || 9999;
+                    const rankB = parseInt(b[rankKey]) || 9999;
+                    
+                    if (rankA !== rankB) return rankA - rankB;
+                    
+                    // Tie-breaker: Fallback to underlying value if ranks are tied (e.g., F Rank 1 vs D Rank 1)
+                    const valA = parseFloat(a[leadersSortCol]) || 0;
+                    const valB = parseFloat(b[leadersSortCol]) || 0;
+                    if (valB !== valA) return valB - valA;
+                    
+                    return (parseFloat(b.xg_gp) || 0) - (parseFloat(a.xg_gp) || 0);
+                } else {
+                    // Sort by Value Descending (Highest to lowest)
+                    const valA = parseFloat(a[leadersSortCol]) || 0;
+                    const valB = parseFloat(b[leadersSortCol]) || 0;
+                    
+                    if (valB !== valA) return valB - valA;
+                    
+                    // Fallback Sorting to break ties
+                    if (leadersSortCol !== 'xg_gp' && b.xg_gp !== a.xg_gp) return b.xg_gp - a.xg_gp;
+                    if (leadersSortCol !== 'dsa_gp' && b.dsa_gp !== a.dsa_gp) return b.dsa_gp - a.dsa_gp;
+                    if (leadersSortCol !== 'goals_gp' && b.goals_gp !== a.goals_gp) return b.goals_gp - a.goals_gp;
+                    return b.oi_xg_gp - a.oi_xg_gp;
+                }
+            });
+            
             const formatStat = (val, rank) => {
                 if (isRanks) return rank > 0 ? rank : '-';
                 return val.toFixed(2);
             };
 
-            const rows = displayData.slice(0, 100).map(p => {
+            const rows = displayData.slice(0, 200).map(p => {
                 const logo = logoMap[(p.team || '').toUpperCase()];
                 const fullPos = (p.pos || '').toUpperCase() === 'D' ? 'Defender' : 'Forward';
                 return `
@@ -737,21 +771,35 @@
                             </div>
                         </td>
                         <td class="text-center stat-val opacity-40 col-gp" style="font-weight: 900;">${p.gp}</td>
-    <td class="text-center stat-val text-blue-600 col-stat" style="font-weight: 900;">${formatStat(p.xg_gp, p.xg_gp_rank)}</td>
-    <td class="text-center stat-val opacity-60 col-stat" style="font-weight: 900;">${formatStat(p.dsa_gp, p.dsa_gp_rank)}</td>
-    <td class="text-center stat-val opacity-60 col-stat" style="font-weight: 900;">${formatStat(p.goals_gp, p.goals_gp_rank)}</td>
-    <td class="text-center stat-val text-purple-600 col-stat" style="font-weight: 900;">${formatStat(p.oi_xg_gp, p.oi_xg_gp_rank)}</td>
-    <td class="text-center stat-val text-purple-400 opacity-60 col-stat" style="font-weight: 900;">${formatStat(p.oi_dsa_gp, p.oi_dsa_gp_rank)}</td>
-    <td class="text-center stat-val opacity-60 col-stat" style="font-weight: 900;">${formatStat(p.assists_gp, p.assists_gp_rank)}</td>
-</tr>
+                        <td class="text-center stat-val text-blue-600 col-stat" style="font-weight: 900; ${leadersSortCol === 'xg_gp' ? 'background-color: #f1f5f9; border-radius: 8px;' : ''}">${formatStat(p.xg_gp, p.xg_gp_rank)}</td>
+                        <td class="text-center stat-val opacity-60 col-stat" style="font-weight: 900; ${leadersSortCol === 'dsa_gp' ? 'background-color: #f1f5f9; border-radius: 8px; opacity: 1; color: #001F3F;' : ''}">${formatStat(p.dsa_gp, p.dsa_gp_rank)}</td>
+                        <td class="text-center stat-val opacity-60 col-stat" style="font-weight: 900; ${leadersSortCol === 'goals_gp' ? 'background-color: #f1f5f9; border-radius: 8px; opacity: 1; color: #001F3F;' : ''}">${formatStat(p.goals_gp, p.goals_gp_rank)}</td>
+                        <td class="text-center stat-val text-purple-600 col-stat" style="font-weight: 900; ${leadersSortCol === 'oi_xg_gp' ? 'background-color: #f8fafc; border-radius: 8px;' : ''}">${formatStat(p.oi_xg_gp, p.oi_xg_gp_rank)}</td>
+                        <td class="text-center stat-val text-purple-400 opacity-60 col-stat" style="font-weight: 900; ${leadersSortCol === 'oi_dsa_gp' ? 'background-color: #f8fafc; border-radius: 8px; opacity: 1;' : ''}">${formatStat(p.oi_dsa_gp, p.oi_dsa_gp_rank)}</td>
+                        <td class="text-center stat-val opacity-60 col-stat" style="font-weight: 900; ${leadersSortCol === 'assists_gp' ? 'background-color: #f8fafc; border-radius: 8px; opacity: 1; color: #9D00FF;' : ''}">${formatStat(p.assists_gp, p.assists_gp_rank)}</td>
+                    </tr>
                 `;
             }).join('');
+
+            // Helper to generate sortable headers
+            const getSortHeader = (key, label, baseClass) => {
+                const isActive = leadersSortCol === key;
+                return `
+                    <th class="${baseClass} col-stat cursor-pointer hover:opacity-80 transition-opacity" onclick="setLeadersSort('${key}')">
+                        <div class="flex items-center justify-center gap-1">
+                            <span>${label}</span>
+                            ${isActive ? `<svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M19 9l-7 7-7-7"></path></svg>` : ''}
+                        </div>
+                    </th>
+                `;
+            };
 
             section.innerHTML = `
                 <div class="flex flex-col items-center mb-6 md:mb-10 pb-4 md:pb-6 border-b border-gray-50 gap-2">
                     <p class="text-[8px] md:text-[10px] text-gray-400 font-black uppercase tracking-widest text-center max-w-xl leading-relaxed">
                         ALL DATA EXCLUDE EMPTY NETS<br>
-                        ALL ON-ICE DATA EXCLUDE THE SKATER'S OWN XG AND DSA
+                        ALL ON-ICE DATA EXCLUDE THE SKATER'S OWN XG AND DSA<br>
+                        <span class="text-[#001F3F] mt-2 block">CLICK HEADERS TO SORT</span>
                     </p>
                 </div>
                 <div class="leaders-table-wrapper">
@@ -761,12 +809,12 @@
                                 <th class="header-basic col-team rounded-tl-2xl">Team</th>
                                 <th class="header-basic col-skater text-left">Skater</th>
                                 <th class="header-basic col-gp">GP</th>
-                                <th class="header-goals col-stat">xG/GP</th>
-                                <th class="header-goals col-stat">DSA/GP</th>
-                                <th class="header-goals col-stat">G/GP</th>
-                                <th class="header-assists col-stat">OI xG/GP</th>
-                                <th class="header-assists col-stat">OI DSA/GP</th>
-                                <th class="header-assists rounded-tr-2xl col-stat">A/GP</th>
+                                ${getSortHeader('xg_gp', 'xG/GP', 'header-goals')}
+                                ${getSortHeader('dsa_gp', 'DSA/GP', 'header-goals')}
+                                ${getSortHeader('goals_gp', 'G/GP', 'header-goals')}
+                                ${getSortHeader('oi_xg_gp', 'OI xG/GP', 'header-assists')}
+                                ${getSortHeader('oi_dsa_gp', 'OI DSA/GP', 'header-assists')}
+                                ${getSortHeader('assists_gp', 'A/GP', 'header-assists rounded-tr-2xl')}
                             </tr>
                         </thead>
                         <tbody>${rows}</tbody>
@@ -1623,17 +1671,22 @@
                     </div>
                 </div>
 
-                <!-- Hits & Blocks Grid -->
-                <div class="grid grid-cols-2 gap-4 mb-8">
-                    <div class="bg-gray-50 border border-gray-200 p-4 rounded-2xl flex flex-col items-center justify-center shadow-sm">
-                        <span class="text-[8px] font-black tracking-widest uppercase text-gray-400 mb-1">LAST 2 WEEKS</span>
-                        <span class="text-xl md:text-2xl font-black text-[#001F3F]">${hb.hits_gp ? hb.hits_gp.toFixed(2) : '0.00'}</span>
-                        <span class="text-[10px] font-black tracking-wider uppercase mt-1 text-gray-500">HITS / GP</span>
+                <!-- Peripherals Grid -->
+                <div class="grid grid-cols-3 gap-3 md:gap-4 mb-8">
+                    <div class="bg-gray-50 border border-gray-200 p-3 md:p-4 rounded-2xl flex flex-col items-center justify-center shadow-sm">
+                        <span class="text-[8px] font-black tracking-widest uppercase text-gray-400 mb-1 text-center">LAST 2 WEEKS</span>
+                        <span class="text-xl md:text-2xl font-black text-[#001F3F]">${l2w.shots_gp ? l2w.shots_gp.toFixed(2) : '0.00'}</span>
+                        <span class="text-[9px] md:text-[10px] font-black tracking-wider uppercase mt-1 text-gray-500">SHOTS / GP</span>
                     </div>
-                    <div class="bg-gray-50 border border-gray-200 p-4 rounded-2xl flex flex-col items-center justify-center shadow-sm">
-                        <span class="text-[8px] font-black tracking-widest uppercase text-gray-400 mb-1">LAST 2 WEEKS</span>
+                    <div class="bg-gray-50 border border-gray-200 p-3 md:p-4 rounded-2xl flex flex-col items-center justify-center shadow-sm">
+                        <span class="text-[8px] font-black tracking-widest uppercase text-gray-400 mb-1 text-center">LAST 2 WEEKS</span>
+                        <span class="text-xl md:text-2xl font-black text-[#001F3F]">${hb.hits_gp ? hb.hits_gp.toFixed(2) : '0.00'}</span>
+                        <span class="text-[9px] md:text-[10px] font-black tracking-wider uppercase mt-1 text-gray-500">HITS / GP</span>
+                    </div>
+                    <div class="bg-gray-50 border border-gray-200 p-3 md:p-4 rounded-2xl flex flex-col items-center justify-center shadow-sm">
+                        <span class="text-[8px] font-black tracking-widest uppercase text-gray-400 mb-1 text-center">LAST 2 WEEKS</span>
                         <span class="text-xl md:text-2xl font-black text-[#001F3F]">${hb.blocks_gp ? hb.blocks_gp.toFixed(2) : '0.00'}</span>
-                        <span class="text-[10px] font-black tracking-wider uppercase mt-1 text-gray-500">BLOCKS / GP</span>
+                        <span class="text-[9px] md:text-[10px] font-black tracking-wider uppercase mt-1 text-gray-500">BLOCKS / GP</span>
                     </div>
                 </div>
 
