@@ -346,7 +346,8 @@
         let hitsBlocksData = [];
         let scheduleData = { headers: [], rows: [] };
         let gameLogsData = [];
-        let ppDataMap = {}; 
+        let ppDataMap = {};
+        let toiRanksMap = {};
         let skaterList = [];
         let opponentXGMap = {};
         let logoMap = {};
@@ -357,7 +358,8 @@
         let currentBPSkaterId = '';
         let currentPosition = 'ALL';
         let activePage = 'leaders';
-        let scheduleVisibleDays = 15;
+        let scheduleStartIndex = 0;
+        let scheduleEndIndex = 14;
         let dataRangeText = '';
         let leadersSortCol = 'xg_gp';
         
@@ -505,7 +507,8 @@
                 if (jsonData.schedule && jsonData.schedule.length > 0) {
                     scheduleData.headers = Object.keys(jsonData.schedule[0]);
                     scheduleData.rows = jsonData.schedule.map(row => scheduleData.headers.map(h => row[h] || ''));
-                    scheduleVisibleDays = scheduleData.headers.length - 1;
+                    scheduleStartIndex = 0;
+                    scheduleEndIndex = scheduleData.headers.length - 2; // -2 accounts for skipping the "Team" column
                 }
                 
                 dataFetchStatus.schedule = true;
@@ -574,6 +577,16 @@
                         hits_gp: parseFloat(getField(row, ['hits_gp', 'hit_gp', 'hit/gp'])) || 0,
                         blocks_gp: parseFloat(getField(row, ['blocks_gp', 'blk_gp', 'blk/gp'])) || 0
                     }));
+                }
+                
+                // 9. Process TOI Ranks Data
+                if (jsonData.toi_ranks) {
+                    jsonData.toi_ranks.forEach(row => {
+                        const key = String(getField(row, ['key', 'skater_id']));
+                        const rank = parseInt(getField(row, ['toi_rank', 'rank'])) || 0;
+                        const toi = parseFloat(getField(row, ['mean_ev_pp_toi', 'toi'])) || 0;
+                        if (key) toiRanksMap[key] = { rank, toi };
+                    });
                 }
 
                 // PRE-LOAD Current Skater with Top Leader
@@ -1133,30 +1146,57 @@
                 return;
             }
             const totalHeaders = scheduleData.headers.slice(1).filter(h => h && h.trim() !== "");
-            const currentEndDate = totalHeaders[scheduleVisibleDays - 1] ? totalHeaders[scheduleVisibleDays - 1].replace(/,/g, '') : '';
+            const currentStartDate = totalHeaders[scheduleStartIndex] ? totalHeaders[scheduleStartIndex].replace(/,/g, '') : '';
+            const currentEndDate = totalHeaders[scheduleEndIndex] ? totalHeaders[scheduleEndIndex].replace(/,/g, '') : '';
+            
             container.innerHTML = `
                 <h2 class="page-title">UPCOMING SCHEDULE</h2>
-                <div class="flex justify-center">
-                    <div class="relative w-full max-w-sm">
-                        <button onclick="toggleDropdown()" id="date-select-btn" class="w-full flex items-center justify-between px-8 py-4 md:py-5 bg-white border-2 border-gray-100 rounded-full md:rounded-[2.5rem] hover:border-blue-100 transition-all shadow-xl shadow-gray-200/40 group">
-                            <div class="flex items-center gap-3 md:gap-4">
-                                <div class="w-10 h-10 md:w-16 md:h-16 bg-blue-50 text-[#001F3F] rounded-xl md:rounded-2xl flex items-center justify-center text-xl font-black">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 md:w-6 md:h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
+                <div class="flex flex-col md:flex-row justify-center gap-4 mt-6 w-full max-w-2xl mx-auto">
+                    
+                    <!-- START DATE DROPDOWN -->
+                    <div class="relative w-full">
+                        <button onclick="toggleDropdown('start-date-dropdown')" id="start-date-btn" class="w-full flex items-center justify-between px-6 md:px-8 py-4 bg-white border-2 border-gray-100 rounded-full md:rounded-[2.5rem] hover:border-blue-100 transition-all shadow-xl shadow-gray-200/40 group">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 bg-blue-50 text-[#001F3F] rounded-xl flex items-center justify-center font-black">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
                                 </div>
                                 <div class="flex flex-col items-start text-left">
-                                    <span class="text-[8px] md:text-[9px] font-black text-gray-400 uppercase tracking-widest mb-0.5 opacity-60">Selected End Date</span>
-                                    <span class="font-black text-xl md:text-3xl tracking-tighter uppercase leading-none text-[#001F3F]">${currentEndDate}</span>
+                                    <span class="text-[8px] md:text-[9px] font-black text-gray-400 uppercase tracking-widest mb-0.5 opacity-60">Start Date</span>
+                                    <span class="font-black text-sm md:text-lg tracking-tighter uppercase leading-none text-[#001F3F]">${currentStartDate}</span>
                                 </div>
                             </div>
-                            <svg class="w-5 h-5 md:w-6 md:h-6 text-gray-300 group-hover:text-[#001F3F] transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M19 9l-7 7-7-7"></path></svg>
+                            <svg class="w-5 h-5 text-gray-300 group-hover:text-[#001F3F] transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M19 9l-7 7-7-7"></path></svg>
                         </button>
-                        <div id="main-dropdown" class="hidden absolute top-full left-0 right-0 mt-3 bg-white border border-gray-100 rounded-3xl shadow-2xl z-[100] max-h-80 overflow-y-auto p-2 flex flex-col gap-1 no-scrollbar">
+                        <div id="start-date-dropdown" class="hidden absolute top-full left-0 right-0 mt-3 bg-white border border-gray-100 rounded-3xl shadow-2xl z-[100] max-h-80 overflow-y-auto p-2 flex flex-col gap-1 no-scrollbar">
                             ${totalHeaders.map((h, i) => `
-                                <button onclick="handleDaysChange('${i+1}')" class="w-full px-4 py-3 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all ${scheduleVisibleDays === i+1 ? 'bg-blue-50 text-[#001F3F]' : 'text-gray-500 hover:bg-gray-50'}">
+                                <button onclick="handleScheduleChange('start', '${i}')" class="w-full px-4 py-3 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all ${scheduleStartIndex === i ? 'bg-blue-50 text-[#001F3F]' : 'text-gray-500 hover:bg-gray-50'}">
                                     ${h.replace(/,/g, '')}
                                 </button>`).join('')}
                         </div>
                     </div>
+
+                    <!-- END DATE DROPDOWN -->
+                    <div class="relative w-full">
+                        <button onclick="toggleDropdown('end-date-dropdown')" id="end-date-btn" class="w-full flex items-center justify-between px-6 md:px-8 py-4 bg-white border-2 border-gray-100 rounded-full md:rounded-[2.5rem] hover:border-blue-100 transition-all shadow-xl shadow-gray-200/40 group">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 bg-blue-50 text-[#001F3F] rounded-xl flex items-center justify-center font-black">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                                </div>
+                                <div class="flex flex-col items-start text-left">
+                                    <span class="text-[8px] md:text-[9px] font-black text-gray-400 uppercase tracking-widest mb-0.5 opacity-60">End Date</span>
+                                    <span class="font-black text-sm md:text-lg tracking-tighter uppercase leading-none text-[#001F3F]">${currentEndDate}</span>
+                                </div>
+                            </div>
+                            <svg class="w-5 h-5 text-gray-300 group-hover:text-[#001F3F] transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M19 9l-7 7-7-7"></path></svg>
+                        </button>
+                        <div id="end-date-dropdown" class="hidden absolute top-full left-0 right-0 mt-3 bg-white border border-gray-100 rounded-3xl shadow-2xl z-[100] max-h-80 overflow-y-auto p-2 flex flex-col gap-1 no-scrollbar">
+                            ${totalHeaders.map((h, i) => `
+                                <button onclick="handleScheduleChange('end', '${i}')" class="w-full px-4 py-3 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all ${scheduleEndIndex === i ? 'bg-blue-50 text-[#001F3F]' : 'text-gray-500 hover:bg-gray-50'}">
+                                    ${h.replace(/,/g, '')}
+                                </button>`).join('')}
+                        </div>
+                    </div>
+
                 </div>`;
         }
 
@@ -1177,7 +1217,8 @@
 
             const processedRows = scheduleData.rows.map(row => {
                 const teamTri = (row[0] || '').toUpperCase(), allOpponents = row.slice(1, 1 + totalDateCount);
-                const gpCount = allOpponents.slice(0, scheduleVisibleDays).filter(opp => opp && opp.trim() !== '').length;
+                // Slice games ONLY from within the selected start and end dates
+                const gpCount = allOpponents.slice(scheduleStartIndex, scheduleEndIndex + 1).filter(opp => opp && opp.trim() !== '').length;
                 return { teamTri, allOpponents, gpCount };
             }).filter(r => r.teamTri).sort((a, b) => b.gpCount !== a.gpCount ? b.gpCount - a.gpCount : a.teamTri.localeCompare(b.teamTri));
 
@@ -1203,12 +1244,11 @@
                     <div class="schedule-grid" style="grid-template-columns: 70px 44px repeat(${totalDateCount}, 52px);">
                         <div class="grid-header" style="grid-row: 1 / span 2; grid-column: 1; height: 84px; border-bottom: 3px solid #64748b !important; border-right: none !important; border-left: 1px solid #f1f5f9; top: 0; z-index: 50;">TEAM</div>
                         <div class="grid-header" style="grid-row: 1 / span 2; grid-column: 2; height: 84px; border-bottom: 3px solid #64748b !important; border-right: 3px solid #cbd5e1; top: 0; z-index: 50;">GP</div>
-                        ${sumsArray.map((sum, i) => `<div class="daily-sum-strip ${i >= scheduleVisibleDays ? 'filtered-out' : ''}" style="grid-column: ${i+3}; grid-row: 1; border-bottom: 3px solid #64748b; font-weight: 900; background-color: ${getGPColor(maxDailySum + minDailySum - sum, minDailySum, maxDailySum)} !important; top: 0;">${sum}</div>`).join('')}
-                        ${totalHeaders.map((date, i) => `<div class="grid-header date-header-cell ${i >= scheduleVisibleDays ? 'filtered-out' : ''} ${date.toUpperCase().includes('SUN') ? 'bg-sunday' : ''}" style="grid-column: ${i+3}; grid-row: 2; border-bottom: 3px solid #64748b;"><span>${date.replace(/,/g, '').split(' ')[0] || ''}</span><span>${date.replace(/,/g, '').split(' ')[1] || ''}</span><span>${date.replace(/,/g, '').split(' ')[2] || ''}</span></div>`).join('')}
+                        ${sumsArray.map((sum, i) => `<div class="daily-sum-strip ${i < scheduleStartIndex || i > scheduleEndIndex ? 'filtered-out' : ''}" style="grid-column: ${i+3}; grid-row: 1; border-bottom: 3px solid #64748b; font-weight: 900; background-color: ${getGPColor(maxDailySum + minDailySum - sum, minDailySum, maxDailySum)} !important; top: 0;">${sum}</div>`).join('')}
+                        ${totalHeaders.map((date, i) => `<div class="grid-header date-header-cell ${i < scheduleStartIndex || i > scheduleEndIndex ? 'filtered-out' : ''} ${date.toUpperCase().includes('SUN') ? 'bg-sunday' : ''}" style="grid-column: ${i+3}; grid-row: 2; border-bottom: 3px solid #64748b;"><span>${date.replace(/,/g, '').split(' ')[0] || ''}</span><span>${date.replace(/,/g, '').split(' ')[1] || ''}</span><span>${date.replace(/,/g, '').split(' ')[2] || ''}</span></div>`).join('')}
                         ${processedRows.map((row, rIdx) => `
                             <div class="grid-cell" style="grid-row: ${rIdx+3}; grid-column: 1; border-right: none !important; border-left: 1px solid #f1f5f9;">${logoMap[row.teamTri] ? `<img src="${logoMap[row.teamTri]}" class="w-12 h-12 object-contain">` : `<span class="text-[10px] font-black">${row.teamTri}</span>`}</div>
-                            <div class="grid-cell" style="grid-row: ${rIdx+3}; grid-column: 2; background-color: ${getGPColor(row.gpCount, Math.min(...processedRows.map(r => r.gpCount)), Math.max(...processedRows.map(r => r.gpCount)))} !important; border-right: 3px solid #cbd5e1; font-weight: 900;">${row.gpCount}</div>
-                            ${row.allOpponents.map((opp, i) => `<div class="grid-cell ${i >= scheduleVisibleDays ? 'filtered-out' : ''} ${totalHeaders[i].toUpperCase().includes('SUN') ? 'bg-sunday' : ''}" style="grid-row: ${rIdx+3}; grid-column: ${i+3}">${opp && logoMap[opp.toUpperCase()] ? `<img src="${logoMap[opp.toUpperCase()]}" class="opponent-logo"><span class="xg-badge" style="background-color: ${getGPColor(opponentXGMap[opp.toUpperCase()] || 0, minOppXg, maxOppXg)}">${(opponentXGMap[opp.toUpperCase()] || 0).toFixed(2)}</span>` : ''}</div>`).join('')}`).join('')}
+                            <div class="grid-cell" style="grid-row: ${rIdx+3}; grid-column: 2; background-color:${getGPColor(row.gpCount, Math.min(...processedRows.map(r => r.gpCount)), Math.max(...processedRows.map(r => r.gpCount)))} !important; border-right: 3px solid #cbd5e1; font-weight: 900;">${row.gpCount}</div>${row.allOpponents.map((opp, i) => `<div class="grid-cell ${i < scheduleStartIndex || i > scheduleEndIndex ? 'filtered-out' : ''} ${totalHeaders[i].toUpperCase().includes('SUN') ? 'bg-sunday' : ''}" style="grid-row: ${rIdx+3}; grid-column: ${i+3}">${opp && logoMap[opp.toUpperCase()] ? `<img src="${logoMap[opp.toUpperCase()]}" class="opponent-logo"><span class="xg-badge" style="background-color: ${getGPColor(opponentXGMap[opp.toUpperCase()] || 0, minOppXg, maxOppXg)}">${(opponentXGMap[opp.toUpperCase()] || 0).toFixed(2)}</span>` : ''}</div>`).join('')}`).join('')}
                     </div>
                 </div>
                 <div class="scroll-hint"><svg class="w-3 h-3 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M17 8l4 4m0 0l-4 4m4-4H3"></path></svg>Swipe for full schedule</div>`;
@@ -1221,12 +1261,14 @@
                 return;
             }
             const skaterInfo = skaterList.find(s => s.id === currentSkaterId) || skaterList[0];
+            const toiData = toiRanksMap[currentSkaterId];
+            
             container.innerHTML = `
                 <h2 class="page-title">GAME LOGS (LAST 2 WEEKS)</h2>
                 ${dataRangeText ? `<div class="page-timestamp">${dataRangeText}</div>` : ''}
-                <div class="flex justify-center">
+                <div class="flex flex-col items-center justify-center gap-4">
                     <div class="relative w-full max-w-sm">
-                        <button onclick="toggleDropdown()" id="skater-select-btn" class="w-full flex items-center justify-between px-6 md:px-8 py-4 md:py-5 bg-white border-2 border-gray-100 rounded-full md:rounded-[2.5rem] hover:border-blue-100 transition-all shadow-xl shadow-gray-200/40 group">
+                        <button onclick="toggleDropdown('main-dropdown')" id="skater-select-btn" class="w-full flex items-center justify-between px-6 md:px-8 py-4 md:py-5 bg-white border-2 border-gray-100 rounded-full md:rounded-[2.5rem] hover:border-blue-100 transition-all shadow-xl shadow-gray-200/40 group">
                             <div class="flex items-center gap-3 md:gap-4">
                                 ${skaterInfo && logoMap[skaterInfo.team] ? `<img src="${logoMap[skaterInfo.team]}" class="w-10 h-10 md:w-16 md:h-16 object-contain">` : `<div class="w-10 h-10 md:w-16 md:h-16 bg-blue-50 text-[#001F3F] rounded-xl flex items-center justify-center text-lg md:text-xl font-black">?</div>`}
                                 <div class="flex flex-col items-start text-left">
@@ -1250,12 +1292,24 @@
                                         ${logoMap[s.team] ? `<img src="${logoMap[s.team]}" class="w-10 h-10 object-contain">` : `<div class="w-10 h-10 bg-gray-100 rounded-lg"></div>`}
                                         <div class="flex flex-col items-start leading-tight">
                                             <span class="uppercase tracking-wider">${s.name}</span>
-                                            <span class="text-[10px] opacity-60">${s.pos} • ${s.team}</span>
+                                            <span class="text-[10px] opacity-60">${s.pos} •${s.team}</span>
                                         </div>
                                     </button>`).join('')}
                             </div>
                         </div>
                     </div>
+                    
+                    ${toiData ? `
+                    <div class="flex items-center gap-6 bg-white px-8 py-3 rounded-2xl border border-gray-100 shadow-sm animate-fade-in">
+                        <div class="flex flex-col items-center border-r border-gray-100 pr-6">
+                            <span class="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-0.5 text-center">EV+PP TOI Rank<br>(Among ${skaterInfo?.pos === 'D' ? 'Defenders' : 'Forwards'})</span>
+                            <span class="text-xl font-black text-[#001F3F]">${toiData.rank}</span>
+                        </div>
+                        <div class="flex flex-col items-center pl-2">
+                            <span class="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-0.5 text-center">Avg EV+PP<br>Per Game</span>
+                            <span class="text-xl font-black text-[#001F3F]">${decimalToMMSS(toiData.toi)}</span>
+                        </div>
+                    </div>` : ''}
                 </div>`;
         }
 
@@ -1286,7 +1340,100 @@
                 return `<div class="log-row"><div class="flex items-center justify-start gap-0 md:gap-1"><img src="${teamLogo}" class="w-8 h-8 md:w-12 md:h-12 object-contain"><span class="text-[7px] md:text-[8px] font-black text-gray-300">vs</span><img src="${oppLogo}" class="w-8 h-8 md:w-12 md:h-12 object-contain"></div><div class="bar-container"><span class="absolute left-1.5 top-1/2 -translate-y-1/2 z-20 text-[8px] md:text-[10px] font-black text-white pointer-events-none drop-shadow-md whitespace-nowrap">${log.date.split('-').slice(1).join('/')}</span><div class="flex h-full overflow-hidden" style="width: ${totalW}%; border-radius: 6px;"><div class="bar-ev h-full" style="width: ${(log.ev / log.total) * 100}%"></div><div class="bar-pp h-full" style="width: ${(log.pp / log.total) * 100}%"></div><div class="bar-sh h-full" style="width: ${(log.sh / log.total) * 100}%"></div><div class="bar-ot h-full" style="width: ${(log.ot / log.total) * 100}%"></div></div></div><div class="flex items-center justify-center"><span class="text-[10px] md:text-[11px] font-black text-[#001F3F]">${decimalToMMSS(log.total)}</span></div><div class="flex items-center justify-center"><div class="px-2 py-1 rounded-lg shadow-sm border ${badgeClass}"><span class="text-[10px] md:text-[11px] font-black text-[#001F3F]">${ppPerc}%</span></div></div></div>`;
             }).join('');
             
-            section.innerHTML = legend + xAxisTitle + `<div>${rows}</div>`;
+            // Generate Line Chart
+            let chartHtml = '';
+            const chartLogs = [...skaterLogs].reverse(); // Read left to right (oldest to newest)
+            if (chartLogs.length > 0) {
+                // Increased dimensions to fit the vertical labels and larger logos
+                const svgW = 800, svgH = 280, padX = 75, padY = 30, padBottom = 90;
+                const graphW = svgW - (padX * 2), graphH = svgH - padY - padBottom;
+                
+                const maxEvRaw = Math.max(...chartLogs.map(l => l.ev), 0.1);
+                const maxEv = Math.ceil(maxEvRaw / 5) * 5; // Round up to nearest 5 minutes
+                
+                let evPoints = '', ppPoints = '', elementsHtml = '';
+                
+                chartLogs.forEach((log, i) => {
+                    const cx = chartLogs.length > 1 ? padX + (i * (graphW / (chartLogs.length - 1))) : svgW / 2;
+                    
+                    const evY = padY + graphH - ((log.ev / maxEv) * graphH);
+                    evPoints += `${cx},${evY} `;
+                    
+                    const ppPerc = Math.round((ppDataMap[log.key] && ppDataMap[log.key][log.date]) || 0);
+                    const ppY = padY + graphH - ((ppPerc / 100) * graphH);
+                    ppPoints += `${cx},${ppY} `;
+                    
+                    // Date
+                    const dateStr = log.date.split('-').slice(1).join('/');
+                    elementsHtml += `<text x="${cx}" y="${padY + graphH + 16}" fill="#94a3b8" font-size="9" font-weight="900" text-anchor="middle">${dateStr}</text>`;
+                    
+                    // Opponent Logo (Size Increased to match bar chart)
+                    const oppLogo = logoMap[log.opp.toUpperCase()];
+                    if(oppLogo) elementsHtml += `<image href="${oppLogo}" x="${cx - 24}" y="${padY + graphH + 24}" width="48" height="48" />`;
+                    
+                    // Points overlay
+                    elementsHtml += `<circle cx="${cx}" cy="${evY}" r="4" fill="#334155" stroke="#ffffff" stroke-width="1.5" />`;
+                    elementsHtml += `<circle cx="${cx}" cy="${ppY}" r="4" fill="#FFEE00" stroke="#334155" stroke-width="1.5" />`;
+
+                    // Data Labels text
+                    const evStr = decimalToMMSS(log.ev);
+                    const ppStr = ppPerc + '%';
+
+                    // Smart Label Placement to prevent overlap
+                    let evLabelY, ppLabelY;
+                    if (Math.abs(evY - ppY) < 22) {
+                        // Points are colliding: Push the higher one up, and the lower one down
+                        if (evY <= ppY) {
+                            evLabelY = evY - 10; // EV is physically higher on screen
+                            ppLabelY = ppY + 16;
+                        } else {
+                            evLabelY = evY + 16;
+                            ppLabelY = ppY - 10; // PP is physically higher on screen
+                        }
+                    } else {
+                        // Plenty of space: Put labels above the points by default
+                        evLabelY = evY - 10;
+                        ppLabelY = ppY - 10;
+                    }
+
+                    // Failsafe: if a label gets pushed off the top of the chart, flip it down
+                    if (evLabelY < padY - 10) evLabelY = evY + 16;
+                    if (ppLabelY < padY - 10) ppLabelY = ppY + 16;
+
+                    // Plot labels with a white text-shadow stroke so they remain readable if a line passes behind them
+                    elementsHtml += `<text x="${cx}" y="${evLabelY}" fill="#334155" font-size="10" font-weight="900" text-anchor="middle" style="text-shadow: 1px 1px 0 #fff, -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff;">${evStr}</text>`;
+                    elementsHtml += `<text x="${cx}" y="${ppLabelY}" fill="#ca8a04" font-size="10" font-weight="900" text-anchor="middle" style="text-shadow: 1px 1px 0 #fff, -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff;">${ppStr}</text>`;
+                });
+
+                chartHtml = `
+                <div class="mt-12 border-t border-gray-50 pt-8">
+                    <div class="flex justify-center mb-6 px-4">
+                        <h3 class="text-[10px] md:text-xs font-black tracking-[0.2em] text-[#001F3F] uppercase text-center">TOI TREND</h3>
+                    </div>
+                    <div class="relative w-full max-w-3xl mx-auto overflow-x-auto no-scrollbar">
+                        <div class="min-w-[500px]">
+                            <svg viewBox="0 0 ${svgW} ${svgH}" class="w-full h-auto overflow-visible font-sans">
+                                <!-- Grid Lines -->
+                                <line x1="${padX}" y1="${padY}" x2="${svgW - padX}" y2="${padY}" stroke="#f1f5f9" stroke-width="1" />
+                                <line x1="${padX}" y1="${padY + graphH}" x2="${svgW - padX}" y2="${padY + graphH}" stroke="#e2e8f0" stroke-width="2" />
+                                
+                                <!-- Y-Axis Legend Titles (Rotated Vertically) -->
+                                <text x="16" y="${padY + graphH/2}" transform="rotate(-90, 16, ${padY + graphH/2})" fill="#334155" font-size="11" font-weight="900" text-anchor="middle" letter-spacing="2">EV TOI</text>
+                                <text x="${svgW - 16}" y="${padY + graphH/2}" transform="rotate(90, ${svgW - 16}, ${padY + graphH/2})" fill="#ca8a04" font-size="11" font-weight="900" text-anchor="middle" letter-spacing="2">POWER PLAY %</text>
+                                
+                                <!-- Trend Lines -->
+                                ${chartLogs.length > 1 ? `<polyline points="${evPoints}" fill="none" stroke="#334155" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />` : ''}
+                                ${chartLogs.length > 1 ? `<polyline points="${ppPoints}" fill="none" stroke="#FFEE00" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />` : ''}
+                                
+                                <!-- Datapoints, Dates & Logos -->
+                                ${elementsHtml}
+                            </svg>
+                        </div>
+                    </div>
+                </div>`;
+            }
+
+            section.innerHTML = legend + xAxisTitle + `<div>${rows}</div>` + chartHtml;
             container.appendChild(section);
         }
         
@@ -1409,7 +1556,17 @@
         function selectTeam(team) { currentTeam = team; renderContent(); }
         function selectPosition(pos) { currentPosition = pos; renderContent(); }
         function selectSkater(name, id) { currentSkater = name; currentSkaterId = id; renderContent(); }
-        function handleDaysChange(val) { scheduleVisibleDays = parseInt(val); renderContent(); }
+        function handleScheduleChange(type, val) {
+            const index = parseInt(val);
+            if (type === 'start') {
+                scheduleStartIndex = index;
+                if (scheduleEndIndex < scheduleStartIndex) scheduleEndIndex = scheduleStartIndex;
+            } else {
+                scheduleEndIndex = index;
+                if (scheduleStartIndex > scheduleEndIndex) scheduleStartIndex = scheduleEndIndex;
+            }
+            renderContent();
+        }
         
         function selectBPSkater(name, id) {
             currentBPSkater = name;
@@ -1697,9 +1854,21 @@
         }
 
         window.onclick = e => { 
-            const isSelectBtn = e.target.closest('#team-select-btn') || e.target.closest('#date-select-btn') || e.target.closest('#skater-select-btn') || e.target.closest('.compare-trigger');
-            if (!isSelectBtn && !e.target.closest('#main-dropdown') && !e.target.closest('[id^="compare-dropdown-"]')) { 
+            const isSelectBtn = e.target.closest('#team-select-btn') || 
+                                e.target.closest('#start-date-btn') || 
+                                e.target.closest('#end-date-btn') || 
+                                e.target.closest('#skater-select-btn') || 
+                                e.target.closest('.compare-trigger');
+                                
+            if (!isSelectBtn && 
+                !e.target.closest('#main-dropdown') && 
+                !e.target.closest('#start-date-dropdown') && 
+                !e.target.closest('#end-date-dropdown') && 
+                !e.target.closest('[id^="compare-dropdown-"]')) { 
+                
                 const d = document.getElementById('main-dropdown'); if (d) d.classList.add('hidden'); 
+                const sd = document.getElementById('start-date-dropdown'); if (sd) sd.classList.add('hidden');
+                const ed = document.getElementById('end-date-dropdown'); if (ed) ed.classList.add('hidden');
                 document.querySelectorAll('[id^="compare-dropdown-"]').forEach(dd => dd.classList.add('hidden'));
             }
         };
