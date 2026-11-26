@@ -256,6 +256,21 @@
             margin-top: -2px;
         }
         .filtered-out { opacity: 0.3; }
+        .filtered-out { opacity: 0.3; }
+        @keyframes activeDotPulse {
+            0%, 100% {
+                transform: translateX(-50%) scale(0.85);
+                opacity: 0.45;
+            }
+            50% {
+                transform: translateX(-50%) scale(1.25);
+                opacity: 1;
+            }
+        }
+        .active-date-pulse {
+            background-color: #9D00FF !important;
+            color: #ffffff !important;
+        }
 
         .scroll-hint {
             display: flex;
@@ -360,6 +375,8 @@
         let activePage = 'leaders';
         let scheduleStartIndex = 0;
         let scheduleEndIndex = 14;
+        let scheduleViewMode = 'full'; 
+        let lightNightMaxGames = 8;    
         let dataRangeText = '';
         let leadersSortCol = 'xg_gp';
         
@@ -1220,6 +1237,7 @@
             const totalHeaders = scheduleData.headers.slice(1).filter(h => h && h.trim() !== "");
             const currentStartDate = totalHeaders[scheduleStartIndex] ? totalHeaders[scheduleStartIndex].replace(/,/g, '') : '';
             const currentEndDate = totalHeaders[scheduleEndIndex] ? totalHeaders[scheduleEndIndex].replace(/,/g, '') : '';
+            const isLightMode = scheduleViewMode === 'light';
             
             container.innerHTML = `
                 <h2 class="page-title">UPCOMING SCHEDULE</h2>
@@ -1269,6 +1287,25 @@
                         </div>
                     </div>
 
+                </div>
+
+                <!-- SCHEDULE VIEW TOGGLE & LIGHT NIGHT THRESHOLD -->
+                <div class="flex flex-col items-center gap-3 mt-5">
+                    <div class="bg-white p-0.5 rounded-full border border-gray-200 shadow-sm inline-flex">
+                        <button onclick="setScheduleViewMode('full')" class="px-5 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest transition-all ${!isLightMode ? 'bg-[#001F3F] text-white shadow-md' : 'text-gray-400 hover:text-[#001F3F]'}">Full Schedule</button>
+                        <button onclick="setScheduleViewMode('light')" class="px-5 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest transition-all ${isLightMode ? 'bg-[#001F3F] text-white shadow-md' : 'text-gray-400 hover:text-[#001F3F]'}">Light Nights</button>
+                    </div>
+
+                    ${isLightMode ? `
+                    <div class="flex flex-wrap items-center justify-center gap-2 bg-white px-4 py-2 rounded-full border border-gray-100 shadow-sm animate-fade-in">
+                        <span class="text-[8px] md:text-[9px] font-black text-gray-400 uppercase tracking-widest mr-1">Max Games:</span>
+                        <div class="flex items-center gap-1">
+                            ${[5, 6, 7, 8, 9, 10].map(n => `
+                                <button onclick="setLightNightMaxGames(${n})" class="w-7 h-7 rounded-full text-[10px] font-black transition-all ${lightNightMaxGames === n ? 'bg-[#001F3F] text-white shadow-sm' : 'bg-gray-50 text-gray-400 hover:text-[#001F3F] hover:bg-gray-100'}">
+                                    ${n}
+                                </button>`).join('')}
+                        </div>
+                    </div>` : ''}
                 </div>`;
         }
 
@@ -1281,18 +1318,51 @@
             section.className = "bg-white rounded-3xl md:rounded-[3rem] shadow-2xl shadow-gray-200/40 border border-gray-50 p-4 md:p-10 relative animate-fade-in w-full mx-auto";
             const totalHeaders = scheduleData.headers.slice(1).filter(h => h && h.trim() !== "");
             const totalDateCount = totalHeaders.length;
+            const isLightMode = scheduleViewMode === 'light';
+
             const visibleOpponentsSet = new Set();
-            scheduleData.rows.forEach(row => { row.slice(1, 1 + totalDateCount).forEach(o => { if(o) visibleOpponentsSet.add(o.toUpperCase()); }); });
+            scheduleData.rows.forEach(row => { row.slice(1, 1 + totalDateCount).forEach(o => { if (o) visibleOpponentsSet.add(o.toUpperCase()); }); });
             const visibleOppXgValues = Array.from(visibleOpponentsSet).map(opp => opponentXGMap[opp]).filter(v => v !== undefined);
             const minOppXg = visibleOppXgValues.length > 0 ? Math.min(...visibleOppXgValues, 1.5) : 1.5;
             const maxOppXg = visibleOppXgValues.length > 0 ? Math.max(...visibleOppXgValues, 4.0) : 4.0;
 
-            const processedRows = scheduleData.rows.map(row => {
-                const teamTri = (row[0] || '').toUpperCase(), allOpponents = row.slice(1, 1 + totalDateCount);
-                // Slice games ONLY from within the selected start and end dates
-                const gpCount = allOpponents.slice(scheduleStartIndex, scheduleEndIndex + 1).filter(opp => opp && opp.trim() !== '').length;
+            // Compute daily total NHL games first so GP counts can filter on light nights
+            const validRows = scheduleData.rows.filter(row => (row[0] || '').trim() !== '');
+            const sumsArray = Array(totalDateCount).fill(0).map((_, i) => {
+                let s = 0;
+                validRows.forEach(row => {
+                    const opp = row[i + 1];
+                    if (opp && opp.trim() !== '') s += 0.5;
+                });
+                return Math.round(s);
+            });
+            const minDailySum = Math.min(...sumsArray), maxDailySum = Math.max(...sumsArray);
+
+            const isDayDimmed = (i) =>
+                i < scheduleStartIndex ||
+                i > scheduleEndIndex ||
+                (isLightMode && sumsArray[i] > lightNightMaxGames);
+                
+            const hasActiveFilter = isLightMode || scheduleStartIndex > 0 || scheduleEndIndex < totalDateCount - 1;
+
+            const processedRows = validRows.map(row => {
+                const teamTri = (row[0] || '').toUpperCase();
+                const allOpponents = row.slice(1, 1 + totalDateCount);
+                let gpCount = 0;
+                for (let i = scheduleStartIndex; i <= scheduleEndIndex; i++) {
+                    const opp = allOpponents[i];
+                    if (opp && opp.trim() !== '') {
+                        if (!isLightMode || sumsArray[i] <= lightNightMaxGames) {
+                            gpCount++;
+                        }
+                    }
+                }
                 return { teamTri, allOpponents, gpCount };
-            }).filter(r => r.teamTri).sort((a, b) => b.gpCount !== a.gpCount ? b.gpCount - a.gpCount : a.teamTri.localeCompare(b.teamTri));
+            }).sort((a, b) => b.gpCount !== a.gpCount ? b.gpCount - a.gpCount : a.teamTri.localeCompare(b.teamTri));
+
+            const gpCounts = processedRows.map(r => r.gpCount);
+            const minGp = gpCounts.length > 0 ? Math.min(...gpCounts) : 0;
+            const maxGp = gpCounts.length > 0 ? Math.max(...gpCounts) : 0;
 
             const getGPColor = (val, min, max) => {
                 if (max === min) return '#ffffff';
@@ -1301,26 +1371,20 @@
                 return `rgb(${Math.round(255 + (0 - 255) * (val - mid) / (max - mid))}, ${Math.round(255 + (229 - 255) * (val - mid) / (max - mid))}, 255)`;
             };
 
-            const sumsArray = Array(totalDateCount).fill(0).map((_, i) => {
-                let s = 0;
-                processedRows.forEach(row => { if (row.allOpponents[i]) s += 0.5; });
-                return Math.round(s);
-            });
-            const minDailySum = Math.min(...sumsArray), maxDailySum = Math.max(...sumsArray);
-
             section.innerHTML = `
                 <p class="text-[7px] md:text-[9px] text-gray-400 font-black uppercase tracking-widest text-center max-w-lg mx-auto mb-6 md:mb-10 leading-relaxed">
                     GRID VALUES SHOW OPPONENT AVERAGE XG/GP ALLOWED DURING REGULATION IN THE LAST TWO WEEKS
+                    ${isLightMode ? `<br><span class="text-[#001F3F] mt-1 inline-block">COUNTING GAMES ON NIGHTS WITH ${lightNightMaxGames} OR FEWER NHL GAMES</span>` : ''}
                 </p>
                 <div class="schedule-container">
                     <div class="schedule-grid" style="grid-template-columns: 70px 44px repeat(${totalDateCount}, 52px);">
                         <div class="grid-header" style="grid-row: 1 / span 2; grid-column: 1; height: 84px; border-bottom: 3px solid #64748b !important; border-right: none !important; border-left: 1px solid #f1f5f9; top: 0; z-index: 50;">TEAM</div>
-                        <div class="grid-header" style="grid-row: 1 / span 2; grid-column: 2; height: 84px; border-bottom: 3px solid #64748b !important; border-right: 3px solid #cbd5e1; top: 0; z-index: 50;">GP</div>
-                        ${sumsArray.map((sum, i) => `<div class="daily-sum-strip ${i < scheduleStartIndex || i > scheduleEndIndex ? 'filtered-out' : ''}" style="grid-column: ${i+3}; grid-row: 1; border-bottom: 3px solid #64748b; font-weight: 900; background-color: ${getGPColor(maxDailySum + minDailySum - sum, minDailySum, maxDailySum)} !important; top: 0;">${sum}</div>`).join('')}
-                        ${totalHeaders.map((date, i) => `<div class="grid-header date-header-cell ${i < scheduleStartIndex || i > scheduleEndIndex ? 'filtered-out' : ''} ${date.toUpperCase().includes('SUN') ? 'bg-sunday' : ''}" style="grid-column: ${i+3}; grid-row: 2; border-bottom: 3px solid #64748b;"><span>${date.replace(/,/g, '').split(' ')[0] || ''}</span><span>${date.replace(/,/g, '').split(' ')[1] || ''}</span><span>${date.replace(/,/g, '').split(' ')[2] || ''}</span></div>`).join('')}
+                        <div class="grid-header" style="grid-row: 1 / span 2; grid-column: 2; height: 84px; border-bottom: 3px solid #64748b !important; border-right: 3px solid #cbd5e1; top: 0; z-index: 50;">${isLightMode ? '<span>LIGHT</span><span>GP</span>' : 'GP'}</div>
+                        ${sumsArray.map((sum, i) => `<div class="daily-sum-strip" style="grid-column: ${i+3}; grid-row: 1; border-bottom: 3px solid #64748b; font-weight: 900; background-color: ${getGPColor(maxDailySum + minDailySum - sum, minDailySum, maxDailySum)} !important; top: 0;">${sum}</div>`).join('')}
+                        ${totalHeaders.map((date, i) => `<div class="grid-header date-header-cell ${!isDayDimmed(i) && hasActiveFilter ? 'active-date-pulse' : ''} ${date.toUpperCase().includes('SUN') ? 'bg-sunday' : ''}" style="grid-column: ${i+3}; grid-row: 2; border-bottom: 3px solid #64748b;"><span>${date.replace(/,/g, '').split(' ')[0] || ''}</span><span>${date.replace(/,/g, '').split(' ')[1] || ''}</span><span>${date.replace(/,/g, '').split(' ')[2] || ''}</span></div>`).join('')}
                         ${processedRows.map((row, rIdx) => `
                             <div class="grid-cell" style="grid-row: ${rIdx+3}; grid-column: 1; border-right: none !important; border-left: 1px solid #f1f5f9;">${logoMap[row.teamTri] ? `<img src="${logoMap[row.teamTri]}" class="w-12 h-12 object-contain">` : `<span class="text-[10px] font-black">${row.teamTri}</span>`}</div>
-                            <div class="grid-cell" style="grid-row: ${rIdx+3}; grid-column: 2; background-color:${getGPColor(row.gpCount, Math.min(...processedRows.map(r => r.gpCount)), Math.max(...processedRows.map(r => r.gpCount)))} !important; border-right: 3px solid #cbd5e1; font-weight: 900;">${row.gpCount}</div>${row.allOpponents.map((opp, i) => `<div class="grid-cell ${i < scheduleStartIndex || i > scheduleEndIndex ? 'filtered-out' : ''} ${totalHeaders[i].toUpperCase().includes('SUN') ? 'bg-sunday' : ''}" style="grid-row: ${rIdx+3}; grid-column: ${i+3}">${opp && logoMap[opp.toUpperCase()] ? `<img src="${logoMap[opp.toUpperCase()]}" class="opponent-logo"><span class="xg-badge" style="background-color: ${getGPColor(opponentXGMap[opp.toUpperCase()] || 0, minOppXg, maxOppXg)}">${(opponentXGMap[opp.toUpperCase()] || 0).toFixed(2)}</span>` : ''}</div>`).join('')}`).join('')}
+                            <div class="grid-cell" style="grid-row: ${rIdx+3}; grid-column: 2; background-color:${getGPColor(row.gpCount, minGp, maxGp)} !important; border-right: 3px solid #cbd5e1; font-weight: 900;">${row.gpCount}</div>${row.allOpponents.map((opp, i) => `<div class="grid-cell ${isDayDimmed(i) ? 'filtered-out' : ''} ${totalHeaders[i].toUpperCase().includes('SUN') ? 'bg-sunday' : ''}" style="grid-row: ${rIdx+3}; grid-column: ${i+3}">${opp && logoMap[opp.toUpperCase()] ? `<img src="${logoMap[opp.toUpperCase()]}" class="opponent-logo"><span class="xg-badge" style="background-color: ${getGPColor(opponentXGMap[opp.toUpperCase()] || 0, minOppXg, maxOppXg)}">${(opponentXGMap[opp.toUpperCase()] || 0).toFixed(2)}</span>` : ''}</div>`).join('')}`).join('')}
                     </div>
                 </div>
                 <div class="scroll-hint"><svg class="w-3 h-3 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M17 8l4 4m0 0l-4 4m4-4H3"></path></svg>Swipe for full schedule</div>`;
@@ -1635,6 +1699,15 @@
                 scheduleEndIndex = index;
                 if (scheduleStartIndex > scheduleEndIndex) scheduleStartIndex = scheduleEndIndex;
             }
+            renderContent();
+        }
+        function setScheduleViewMode(mode) {
+            scheduleViewMode = mode;
+            renderContent();
+        }
+
+        function setLightNightMaxGames(maxGames) {
+            lightNightMaxGames = parseInt(maxGames, 10);
             renderContent();
         }
         
